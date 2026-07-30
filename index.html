@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Vectr — Live Flight Tracker</title>
+<meta name="description" content="Free, open-source real-time flight tracker built on public ADS-B data. Search any flight, watch it move, and get AI-assisted insights." />
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2220%22 font-size=%2220%22>✈️</text></svg>">
+</head>
+<body data-theme="dark">
+
+<div class="radar-bg" aria-hidden="true">
+  <div class="radar-sweep"></div>
+  <div class="radar-ring r1"></div>
+  <div class="radar-ring r2"></div>
+  <div class="radar-ring r3"></div>
+</div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark">▲</span>
+    <span class="brand-name">VECTR</span>
+  </div>
+  <nav class="topnav">
+    <button id="navAirports" class="icon-btn" title="Airport departures &amp; arrivals">✈ Airports</button>
+    <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle light/dark theme">◐</button>
+    <a class="icon-btn" href="https://github.com/" id="ghLink" title="View source on GitHub" aria-label="View source on GitHub">GH</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero" id="heroSection">
+    <p class="eyebrow">Live · Public ADS-B data · No account needed</p>
+    <h1>Track any flight,<br>anywhere, right now.</h1>
+    <p class="hero-sub">Vectr pulls live aircraft positions straight from the open ADS-B network. Type a callsign or flight number to find it in the sky.</p>
+
+    <form id="searchForm" class="search-bar" autocomplete="off">
+      <span class="search-icon">⌕</span>
+      <input id="searchInput" type="text" placeholder="Try BA15, UA123, or BAW15…" maxlength="10" aria-label="Flight number or callsign" />
+      <button type="submit" class="search-btn">Track</button>
+    </form>
+
+    <div class="quick-row">
+      <span class="quick-label">Recent:</span>
+      <div id="historyChips" class="chips"></div>
+    </div>
+
+    <div id="searchStatus" class="search-status" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="app-view" id="appView" hidden>
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="map-controls">
+        <button id="recenterBtn" class="chip-btn">⌖ Recenter</button>
+        <button id="autoRefreshBtn" class="chip-btn active">↻ Auto-refresh: On</button>
+        <span id="lastUpdated" class="last-updated"></span>
+      </div>
+      <button id="backBtn" class="back-btn">← New search</button>
+    </div>
+
+    <aside class="info-panel" id="infoPanel">
+      <div class="panel-header">
+        <div class="flap-board" id="flapCallsign" aria-label="Flight callsign"></div>
+        <div class="flight-sub" id="flightSub">—</div>
+        <span class="status-pill" id="statusPill">LOADING</span>
+      </div>
+
+      <div class="route-strip" id="routeStrip">
+        <div class="route-airport">
+          <div class="route-code" id="originCode">—</div>
+          <div class="route-city" id="originCity">Origin</div>
+        </div>
+        <div class="route-line"><span class="plane-glyph">✈</span></div>
+        <div class="route-airport">
+          <div class="route-code" id="destCode">—</div>
+          <div class="route-city" id="destCity">Destination</div>
+        </div>
+      </div>
+
+      <div class="telemetry-grid">
+        <div class="tele-card"><span class="tele-label">Altitude</span><span class="tele-value" id="teleAlt">—</span></div>
+        <div class="tele-card"><span class="tele-label">Ground speed</span><span class="tele-value" id="teleSpeed">—</span></div>
+        <div class="tele-card"><span class="tele-label">Heading</span><span class="tele-value" id="teleHeading">—</span></div>
+        <div class="tele-card"><span class="tele-label">Vertical rate</span><span class="tele-value" id="teleVrate">—</span></div>
+        <div class="tele-card"><span class="tele-label">Squawk</span><span class="tele-value" id="teleSquawk">—</span></div>
+        <div class="tele-card"><span class="tele-label">Position</span><span class="tele-value" id="telePos">—</span></div>
+      </div>
+
+      <div class="ai-panel">
+        <div class="ai-header">
+          <span class="ai-dot"></span>
+          <span>AI Flight Insights</span>
+          <span class="ai-tag">heuristic, on-device</span>
+        </div>
+        <ul id="aiInsights" class="ai-list"></ul>
+      </div>
+
+      <div class="history-panel">
+        <div class="panel-subhead">Track history (this session)</div>
+        <div id="historyNote" class="history-note">Position samples build up while this tab stays open. OpenSky's free tier doesn't expose historical tracks without a registered account.</div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="airport-view" id="airportView" hidden>
+    <div class="airport-search-row">
+      <form id="airportSearchForm" class="search-bar airport-search-bar" autocomplete="off">
+        <span class="search-icon">⌕</span>
+        <input id="airportSearchInput" type="text" placeholder="Search an airport — code or city (LHR, JFK, Tokyo…)" aria-label="Airport code or city" />
+        <button type="submit" class="search-btn">Find</button>
+      </form>
+      <button id="airportBackBtn" class="back-btn airport-back-btn">← Home</button>
+    </div>
+
+    <div id="airportEmptyState" class="tip-card airport-tip">
+      <h3>Look up any major airport</h3>
+      <p>Search by IATA/ICAO code or city name (try <code>LHR</code>, <code>JFK</code>, <code>Singapore</code>). You'll get a live board of aircraft currently climbing away from or descending into the airport — free, no signup — plus an optional real scheduled timetable if you add your own free AeroDataBox key.</p>
+    </div>
+
+    <div id="airportContent" class="airport-content" hidden>
+      <div class="airport-header">
+        <div>
+          <h2 id="airportName">—</h2>
+          <p id="airportMeta" class="airport-meta">—</p>
+        </div>
+        <button id="airportSettingsBtn" class="chip-btn" title="Add optional schedule API key">⚙ Schedule key</button>
+      </div>
+
+      <div id="airportMiniMap" class="airport-mini-map"></div>
+
+      <div class="board-tabs" role="tablist">
+        <button class="board-tab active" data-tab="arrivals">Likely arrivals</button>
+        <button class="board-tab" data-tab="departures">Likely departures</button>
+        <button class="board-tab" data-tab="nearby">All nearby traffic</button>
+      </div>
+      <p class="board-note">Inferred live from current altitude, vertical rate, and heading relative to the airport — not an official schedule. <span id="boardUpdated"></span></p>
+      <div id="boardList" class="board-list"></div>
+
+      <div class="schedule-section">
+        <div class="panel-subhead">Scheduled timetable</div>
+        <div id="scheduleGate" class="schedule-gate">
+          <p>Real gate/terminal/scheduled-time data needs a licensed schedule provider — no one gives that away with zero signup. Add your own free <a href="https://aerodatabox.com/" target="_blank" rel="noopener">AeroDataBox</a> key (free tier via RapidAPI or API.market) to unlock this here. The key is stored only in your browser and is never sent anywhere but AeroDataBox.</p>
+          <button id="addKeyBtn" class="search-btn">Add free API key</button>
+        </div>
+        <div id="scheduleContent" class="schedule-content" hidden></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="keyModal" class="modal" hidden>
+    <div class="modal-card">
+      <h3>Add your AeroDataBox key</h3>
+      <p>Sign up free at <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI</a> and subscribe to AeroDataBox's free plan to get a key. Paste it below — it's saved only in this browser's local storage.</p>
+      <input id="keyInput" type="text" placeholder="Your RapidAPI key" />
+      <div class="modal-actions">
+        <button id="keySaveBtn" class="search-btn">Save</button>
+        <button id="keyClearBtn" class="chip-btn">Clear key</button>
+        <button id="keyCancelBtn" class="chip-btn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="empty-tip" id="emptyTip">
+    <div class="tip-card">
+      <h3>How search works</h3>
+      <p>Type a flight number the way you'd see it on a boarding pass (<code>BA15</code>, <code>UA123</code>) — Vectr resolves the airline's 2-letter code to the 3-letter code its transponder actually broadcasts (<code>BAW15</code>, <code>UAL123</code>) and matches it against live callsigns. You can also type the raw callsign directly. Not every flight is airborne right now — try a currently active one, or check <a href="https://www.flightradar24.com/data/flights" target="_blank" rel="noopener">a live flight board</a> for one to test with.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p>Vectr is free &amp; open source. Flight data via <a href="https://opensky-network.org/" target="_blank" rel="noopener">The OpenSky Network</a>. Map tiles via <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a> / OpenStreetMap. Not for operational or safety-critical use.</p>
+</footer>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/views.js"></script>
+<script src="js/airports.js"></script>
+<script src="js/airlines.js"></script>
+<script src="js/opensky.js"></script>
+<script src="js/aerodatabox.js"></script>
+<script src="js/app.js"></script>
+<script src="js/airportview.js"></script>
+</body>
+</html>

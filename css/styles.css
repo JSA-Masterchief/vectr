@@ -1,0 +1,342 @@
+/* =========================================================
+   VECTR — design tokens
+   ========================================================= */
+:root{
+  --bg-0:#080B10;
+  --bg-1:#0E141B;
+  --bg-2:#141C26;
+  --line:#232E3B;
+  --line-soft:#1A2330;
+  --text-0:#EAF1F6;
+  --text-1:#9FB0C0;
+  --text-2:#647486;
+  --accent:#2DD9C4;
+  --accent-dim:#1B7A6E;
+  --amber:#F5A623;
+  --red:#F2555A;
+  --font-display:'Space Grotesk', system-ui, sans-serif;
+  --font-mono:'JetBrains Mono', ui-monospace, monospace;
+  --font-body:'Inter', system-ui, sans-serif;
+  --radius:10px;
+  --shadow-lift: 0 20px 60px -20px rgba(0,0,0,0.6);
+}
+
+[data-theme="light"]{
+  --bg-0:#F5F7F9;
+  --bg-1:#FFFFFF;
+  --bg-2:#EEF2F5;
+  --line:#DCE3E8;
+  --line-soft:#E8EDF0;
+  --text-0:#101820;
+  --text-1:#48576A;
+  --text-2:#8494A3;
+  --accent:#0E9C8C;
+  --accent-dim:#B7EDE6;
+}
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--bg-0);
+  color:var(--text-0);
+  font-family:var(--font-body);
+  min-height:100vh;
+  position:relative;
+  overflow-x:hidden;
+  transition:background .25s ease, color .25s ease;
+}
+
+::selection{background:var(--accent); color:#04211D;}
+
+a{color:var(--accent);}
+
+/* =========================================================
+   Ambient radar background (signature element)
+   ========================================================= */
+.radar-bg{
+  position:fixed; inset:0;
+  pointer-events:none;
+  z-index:0;
+  overflow:hidden;
+  opacity:.55;
+}
+[data-theme="light"] .radar-bg{opacity:.18;}
+.radar-ring{
+  position:absolute; left:50%; top:38%;
+  border:1px solid var(--line);
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+}
+.radar-ring.r1{width:340px;height:340px;}
+.radar-ring.r2{width:640px;height:640px;}
+.radar-ring.r3{width:960px;height:960px;}
+.radar-sweep{
+  position:absolute; left:50%; top:38%;
+  width:960px;height:960px;
+  transform:translate(-50%,-50%);
+  background:conic-gradient(from 0deg, transparent 0deg, rgba(45,217,196,0.25) 18deg, transparent 40deg);
+  border-radius:50%;
+  animation:sweep 6s linear infinite;
+}
+@keyframes sweep{ to{ transform:translate(-50%,-50%) rotate(360deg); } }
+@media (prefers-reduced-motion: reduce){ .radar-sweep{ animation:none; } }
+
+/* =========================================================
+   Top bar
+   ========================================================= */
+.topbar{
+  position:relative; z-index:2;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:22px 32px;
+}
+.brand{display:flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:700; letter-spacing:.06em;}
+.brand-mark{color:var(--accent);}
+.brand-name{font-size:1.05rem;}
+.topnav{display:flex; gap:8px;}
+.icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  height:36px; min-width:36px; padding:0 10px;
+  border-radius:999px; border:1px solid var(--line);
+  background:var(--bg-1); color:var(--text-1);
+  font-family:var(--font-mono); font-size:.8rem;
+  text-decoration:none; cursor:pointer;
+  transition:border-color .15s, color .15s;
+}
+.icon-btn:hover{border-color:var(--accent); color:var(--accent);}
+
+/* =========================================================
+   Hero
+   ========================================================= */
+.hero{
+  position:relative; z-index:2;
+  max-width:760px; margin:6vh auto 0; padding:0 24px;
+  text-align:center;
+}
+.eyebrow{
+  font-family:var(--font-mono); font-size:.78rem; letter-spacing:.08em;
+  color:var(--accent); text-transform:uppercase; margin:0 0 18px;
+}
+.hero h1{
+  font-family:var(--font-display); font-weight:700;
+  font-size:clamp(2.1rem, 5vw, 3.4rem); line-height:1.08; margin:0 0 18px;
+}
+.hero-sub{color:var(--text-1); font-size:1.02rem; line-height:1.6; margin:0 auto 34px; max-width:520px;}
+
+.search-bar{
+  display:flex; align-items:center; gap:10px;
+  background:var(--bg-1); border:1px solid var(--line); border-radius:14px;
+  padding:8px 8px 8px 18px; box-shadow:var(--shadow-lift);
+  max-width:520px; margin:0 auto;
+}
+.search-icon{color:var(--text-2); font-size:1.1rem;}
+#searchInput{
+  flex:1; border:none; outline:none; background:transparent;
+  color:var(--text-0); font-family:var(--font-mono); font-size:1rem;
+  letter-spacing:.03em; text-transform:uppercase;
+}
+#searchInput::placeholder{color:var(--text-2); text-transform:none; letter-spacing:0;}
+.search-btn{
+  background:var(--accent); color:#04211D; border:none; border-radius:10px;
+  padding:12px 22px; font-family:var(--font-display); font-weight:600; font-size:.92rem;
+  cursor:pointer; transition:filter .15s;
+}
+.search-btn:hover{filter:brightness(1.08);}
+
+.quick-row{margin-top:20px; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;}
+.quick-label{color:var(--text-2); font-size:.82rem;}
+.chips{display:flex; gap:8px; flex-wrap:wrap;}
+.chip{
+  font-family:var(--font-mono); font-size:.78rem; color:var(--text-1);
+  border:1px solid var(--line); background:var(--bg-1);
+  padding:5px 12px; border-radius:999px; cursor:pointer;
+}
+.chip:hover{border-color:var(--accent); color:var(--accent);}
+
+.search-status{min-height:24px; margin-top:16px; font-family:var(--font-mono); font-size:.85rem; color:var(--amber);}
+
+/* =========================================================
+   App view (map + panel)
+   ========================================================= */
+.app-view{
+  position:relative; z-index:2;
+  display:grid; grid-template-columns: 1fr 380px;
+  gap:0; height:calc(100vh - 78px);
+  border-top:1px solid var(--line-soft);
+}
+.map-wrap{position:relative;}
+#map{position:absolute; inset:0; background:var(--bg-2);}
+.map-controls{
+  position:absolute; top:16px; left:16px; z-index:500;
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+}
+.chip-btn{
+  font-family:var(--font-mono); font-size:.78rem;
+  background:var(--bg-1); color:var(--text-1); border:1px solid var(--line);
+  padding:7px 14px; border-radius:999px; cursor:pointer;
+}
+.chip-btn.active{border-color:var(--accent); color:var(--accent);}
+.last-updated{font-family:var(--font-mono); font-size:.72rem; color:var(--text-2); background:var(--bg-1); padding:6px 10px; border-radius:999px; border:1px solid var(--line);}
+.back-btn{
+  position:absolute; bottom:16px; left:16px; z-index:500;
+  font-family:var(--font-mono); font-size:.8rem;
+  background:var(--bg-1); color:var(--text-1); border:1px solid var(--line);
+  padding:8px 14px; border-radius:999px; cursor:pointer;
+}
+.back-btn:hover{color:var(--accent); border-color:var(--accent);}
+
+.info-panel{
+  background:var(--bg-1); border-left:1px solid var(--line-soft);
+  overflow-y:auto; padding:24px;
+}
+.panel-header{margin-bottom:18px;}
+.flap-board{display:flex; gap:4px; font-family:var(--font-mono); font-weight:700; font-size:1.7rem; letter-spacing:.04em;}
+.flap-char{
+  background:var(--bg-2); border:1px solid var(--line); border-radius:6px;
+  width:34px; height:44px; display:flex; align-items:center; justify-content:center;
+  color:var(--accent); animation:flap .35s ease;
+}
+@keyframes flap{ from{ transform:rotateX(90deg); opacity:0;} to{ transform:rotateX(0deg); opacity:1;} }
+.flight-sub{color:var(--text-1); font-size:.88rem; margin-top:8px;}
+.status-pill{
+  display:inline-block; margin-top:10px; font-family:var(--font-mono); font-size:.72rem;
+  padding:4px 10px; border-radius:999px; background:var(--accent-dim); color:var(--accent);
+  letter-spacing:.05em;
+}
+.status-pill.warn{background:rgba(245,166,35,0.18); color:var(--amber);}
+.status-pill.bad{background:rgba(242,85,90,0.18); color:var(--red);}
+
+.route-strip{
+  display:flex; align-items:center; justify-content:space-between;
+  background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius);
+  padding:16px; margin-bottom:18px;
+}
+.route-airport{text-align:center; flex:1;}
+.route-code{font-family:var(--font-mono); font-weight:700; font-size:1.3rem;}
+.route-city{font-size:.72rem; color:var(--text-2); margin-top:2px;}
+.route-line{flex:1.4; position:relative; height:1px; background:var(--line); margin:0 8px;}
+.plane-glyph{
+  position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:var(--bg-2); color:var(--accent); padding:0 6px; font-size:.95rem;
+}
+
+.telemetry-grid{
+  display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;
+}
+.tele-card{
+  background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius);
+  padding:12px 14px;
+}
+.tele-label{display:block; font-size:.7rem; color:var(--text-2); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;}
+.tele-value{font-family:var(--font-mono); font-weight:600; font-size:1.05rem; color:var(--text-0);}
+
+.ai-panel{
+  background:linear-gradient(160deg, rgba(45,217,196,0.08), transparent 60%);
+  border:1px solid var(--line); border-radius:var(--radius);
+  padding:16px; margin-bottom:18px;
+}
+.ai-header{
+  display:flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:600;
+  font-size:.9rem; margin-bottom:10px;
+}
+.ai-dot{width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent);}
+.ai-tag{margin-left:auto; font-family:var(--font-mono); font-size:.65rem; color:var(--text-2); border:1px solid var(--line); padding:2px 8px; border-radius:999px;}
+.ai-list{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px;}
+.ai-list li{font-size:.86rem; color:var(--text-1); line-height:1.5; padding-left:14px; position:relative;}
+.ai-list li::before{content:'›'; position:absolute; left:0; color:var(--accent);}
+
+.panel-subhead{font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-2); margin-bottom:8px;}
+.history-note{font-size:.82rem; color:var(--text-2); line-height:1.5;}
+
+.empty-tip{position:relative; z-index:2; max-width:640px; margin:8px auto 60px; padding:0 24px;}
+.tip-card{background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px;}
+.tip-card h3{margin:0 0 8px; font-family:var(--font-display); font-size:1rem;}
+.tip-card p{margin:0; color:var(--text-1); font-size:.88rem; line-height:1.6;}
+.tip-card code{font-family:var(--font-mono); background:var(--bg-2); padding:1px 6px; border-radius:4px;}
+
+.site-footer{
+  position:relative; z-index:2; text-align:center; padding:28px 20px 40px;
+  color:var(--text-2); font-size:.78rem;
+}
+
+/* Leaflet marker */
+.plane-icon{ color:var(--accent); filter: drop-shadow(0 0 6px rgba(45,217,196,.6)); }
+.plane-marker-wrap{ transition: transform 1s linear; }
+
+/* =========================================================
+   Airport Explorer
+   ========================================================= */
+.airport-view{
+  position:relative; z-index:2;
+  max-width:900px; margin:5vh auto 60px; padding:0 24px;
+}
+.airport-search-row{display:flex; align-items:center; gap:14px; margin-bottom:24px;}
+.airport-search-bar{flex:1; max-width:none; margin:0;}
+.airport-back-btn{position:static;}
+.airport-tip{margin-top:8px;}
+
+.airport-header{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:16px;}
+.airport-header h2{font-family:var(--font-display); margin:0 0 4px; font-size:1.5rem;}
+.airport-meta{color:var(--text-1); font-size:.85rem; margin:0; font-family:var(--font-mono);}
+
+.airport-mini-map{height:220px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line); margin-bottom:20px;}
+
+.board-tabs{display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;}
+.board-tab{
+  font-family:var(--font-mono); font-size:.8rem;
+  background:var(--bg-1); color:var(--text-1); border:1px solid var(--line);
+  padding:8px 16px; border-radius:999px; cursor:pointer;
+}
+.board-tab.active{background:var(--accent); color:#04211D; border-color:var(--accent);}
+.board-note{font-size:.78rem; color:var(--text-2); margin:0 0 12px;}
+
+.board-list{display:flex; flex-direction:column; gap:8px; margin-bottom:28px;}
+.board-row{
+  display:grid; grid-template-columns:1.1fr 1.3fr .9fr .8fr 1fr;
+  gap:8px; align-items:center; text-align:left;
+  background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius);
+  padding:12px 14px; cursor:pointer; font-family:var(--font-body);
+  transition:border-color .15s;
+}
+.board-row:hover{border-color:var(--accent);}
+.board-callsign{font-family:var(--font-mono); font-weight:700; color:var(--accent);}
+.board-detail{font-size:.82rem; color:var(--text-1);}
+.board-empty{color:var(--text-2); font-size:.88rem; padding:16px 0;}
+
+.schedule-section{border-top:1px solid var(--line-soft); padding-top:20px;}
+.schedule-gate{background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius); padding:18px; text-align:left;}
+.schedule-gate p{color:var(--text-1); font-size:.88rem; line-height:1.6; margin:0 0 14px;}
+.schedule-block{margin-bottom:20px;}
+.schedule-block h4{font-family:var(--font-display); font-size:.95rem; margin:0 0 10px;}
+.schedule-table{width:100%; border-collapse:collapse; font-size:.82rem;}
+.schedule-table th{text-align:left; color:var(--text-2); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; padding:6px 10px; border-bottom:1px solid var(--line);}
+.schedule-table td{padding:8px 10px; border-bottom:1px solid var(--line-soft); font-family:var(--font-mono); color:var(--text-0);}
+
+/* Modal */
+.modal{position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:20px;}
+.modal-card{background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius); padding:24px; max-width:420px; width:100%; box-shadow:var(--shadow-lift);}
+.modal-card h3{margin:0 0 10px; font-family:var(--font-display);}
+.modal-card p{color:var(--text-1); font-size:.85rem; line-height:1.6; margin:0 0 14px;}
+.modal-card input{
+  width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line);
+  background:var(--bg-2); color:var(--text-0); font-family:var(--font-mono); font-size:.9rem;
+  margin-bottom:14px;
+}
+.modal-actions{display:flex; gap:8px; flex-wrap:wrap;}
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+@media (max-width: 880px){
+  .app-view{grid-template-columns:1fr; height:auto;}
+  .map-wrap{height:52vh;}
+  .info-panel{border-left:none; border-top:1px solid var(--line-soft); max-height:none;}
+}
+@media (max-width: 560px){
+  .topbar{padding:16px 18px;}
+  .hero{margin-top:3vh;}
+  .telemetry-grid{grid-template-columns:1fr 1fr;}
+  .airport-search-row{flex-direction:column; align-items:stretch;}
+  .board-row{grid-template-columns:1fr 1fr; row-gap:4px;}
+  .schedule-table{font-size:.72rem;}
+  .brand-name{display:none;}
+}
