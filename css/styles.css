@@ -159,10 +159,11 @@ a{color:var(--accent);}
    ========================================================= */
 .app-view{
   position:relative; z-index:2;
-  display:grid; grid-template-columns: 1fr 380px;
   gap:0; height:calc(100vh - 78px);
   border-top:1px solid var(--line-soft);
+  display:none;
 }
+.app-view:not([hidden]){display:grid; grid-template-columns: 1fr 380px;}
 .map-wrap{position:relative;}
 #map{position:absolute; inset:0; background:var(--bg-2);}
 .map-controls{
@@ -312,7 +313,8 @@ a{color:var(--accent);}
 .schedule-table td{padding:8px 10px; border-bottom:1px solid var(--line-soft); font-family:var(--font-mono); color:var(--text-0);}
 
 /* Modal */
-.modal{position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:20px;}
+.modal{position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.55); padding:20px; display:none;}
+.modal:not([hidden]){display:flex; align-items:center; justify-content:center;}
 .modal-card{background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius); padding:24px; max-width:420px; width:100%; box-shadow:var(--shadow-lift);}
 .modal-card h3{margin:0 0 10px; font-family:var(--font-display);}
 .modal-card p{color:var(--text-1); font-size:.85rem; line-height:1.6; margin:0 0 14px;}
