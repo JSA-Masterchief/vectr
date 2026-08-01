@@ -46,7 +46,7 @@
 
     <form id="searchForm" class="search-bar" autocomplete="off">
       <span class="search-icon">⌕</span>
-      <input id="searchInput" type="text" placeholder="Try BA15, UA123, or BAW15…" maxlength="10" aria-label="Flight number or callsign" />
+      <input id="searchInput" class="search-field" type="text" placeholder="Try BA15, UA123, or BAW15…" maxlength="10" aria-label="Flight number or callsign" />
       <button type="submit" class="search-btn">Track</button>
     </form>
 
@@ -117,7 +117,7 @@
     <div class="airport-search-row">
       <form id="airportSearchForm" class="search-bar airport-search-bar" autocomplete="off">
         <span class="search-icon">⌕</span>
-        <input id="airportSearchInput" type="text" placeholder="Search an airport — code or city (LHR, JFK, Tokyo…)" aria-label="Airport code or city" />
+        <input id="airportSearchInput" class="search-field" type="text" placeholder="Search an airport — code or city (LHR, JFK, Tokyo…)" aria-label="Airport code or city" />
         <button type="submit" class="search-btn">Find</button>
       </form>
       <button id="airportBackBtn" class="back-btn airport-back-btn">← Home</button>
@@ -137,7 +137,10 @@
         <button id="airportSettingsBtn" class="chip-btn" title="Add optional schedule API key">⚙ Schedule key</button>
       </div>
 
-      <div id="airportMiniMap" class="airport-mini-map"></div>
+      <div class="mini-map-row">
+        <div id="airportMiniMap" class="airport-mini-map"></div>
+        <button id="expandMapBtn" class="chip-btn expand-map-btn" title="Open this map larger">⤢ Expand map</button>
+      </div>
 
       <div class="board-tabs" role="tablist">
         <button class="board-tab active" data-tab="arrivals">Likely arrivals</button>
@@ -157,6 +160,16 @@
       </div>
     </div>
   </section>
+
+  <div id="mapModal" class="modal" hidden>
+    <div class="modal-card map-modal-card">
+      <div class="map-modal-header">
+        <h3 id="mapModalTitle">Airport map</h3>
+        <button id="mapModalCloseBtn" class="chip-btn">✕ Close</button>
+      </div>
+      <div id="fullMap" class="full-map"></div>
+    </div>
+  </div>
 
   <div id="keyModal" class="modal" hidden>
     <div class="modal-card">

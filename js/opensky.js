@@ -138,6 +138,7 @@ const OpenSky = (() => {
 
     const url = `${STATES_URL}?lamin=${latMin}&lamax=${latMax}&lomin=${lonMin}&lomax=${lonMax}`;
     const res = await fetch(url);
+    if (res.status === 429) throw new Error('RATE_LIMIT');
     if (!res.ok) throw new Error(`OpenSky responded ${res.status}`);
     const data = await res.json();
     const states = (data.states || []).map(rowToFlight);

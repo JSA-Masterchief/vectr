@@ -41,6 +41,14 @@
   const keyClearBtn = document.getElementById('keyClearBtn');
   const keyCancelBtn = document.getElementById('keyCancelBtn');
 
+  const expandMapBtn = document.getElementById('expandMapBtn');
+  const mapModal = document.getElementById('mapModal');
+  const mapModalTitle = document.getElementById('mapModalTitle');
+  const mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
+
+  let fullMap = null;
+  let fullMapMarkers = [];
+
   let miniMap = null;
   let miniMarker = null;
   let currentAirport = null;
@@ -112,6 +120,64 @@
     setTimeout(() => miniMap.invalidateSize(), 50);
   }
 
+  function openFullMap() {
+    if (!currentAirport) return;
+    mapModalTitle.textContent = `${currentAirport.name} — live traffic`;
+    mapModal.hidden = false;
+    mapModal.style.display = 'flex';
+
+    if (!fullMap) {
+      fullMap = L.map('fullMap', { zoomControl: true, attributionControl: false });
+    }
+    const tileUrl = document.body.getAttribute('data-theme') === 'dark'
+      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+      : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+    fullMap.eachLayer((l) => fullMap.removeLayer(l));
+    L.tileLayer(tileUrl, { subdomains: 'abcd', maxZoom: 19 }).addTo(fullMap);
+    fullMap.setView([currentAirport.lat, currentAirport.lon], 8);
+
+    L.circleMarker([currentAirport.lat, currentAirport.lon], {
+      radius: 8, color: '#F5A623', fillColor: '#F5A623', fillOpacity: 1,
+    }).bindTooltip(currentAirport.name, { permanent: false }).addTo(fullMap);
+
+    fullMapMarkers = [];
+    const all = [
+      ...lastClassified.arrivals.map((f) => ({ ...f, kind: 'arrival' })),
+      ...lastClassified.departures.map((f) => ({ ...f, kind: 'departure' })),
+      ...lastClassified.nearby.map((f) => ({ ...f, kind: 'nearby' })),
+    ];
+    const colors = { arrival: '#2DD9C4', departure: '#F2555A', nearby: '#9FB0C0' };
+    all.forEach((f) => {
+      if (f.latitude == null || f.longitude == null) return;
+      const marker = L.circleMarker([f.latitude, f.longitude], {
+        radius: 6, color: colors[f.kind], fillColor: colors[f.kind], fillOpacity: 0.9,
+      })
+        .bindTooltip(`${f.callsign || 'Unknown'} · ${f.kind}`, { permanent: false })
+        .addTo(fullMap);
+      marker.on('click', () => {
+        if (f.callsign && window.VectrTrackFlight) {
+          closeFullMap();
+          Views.show('app');
+          window.VectrTrackFlight(f.callsign);
+        }
+      });
+      fullMapMarkers.push(marker);
+    });
+
+    setTimeout(() => fullMap.invalidateSize(), 60);
+  }
+
+  function closeFullMap() {
+    mapModal.hidden = true;
+    mapModal.style.display = 'none';
+  }
+
+  expandMapBtn.addEventListener('click', openFullMap);
+  mapModalCloseBtn.addEventListener('click', closeFullMap);
+  mapModal.addEventListener('click', (e) => {
+    if (e.target === mapModal) closeFullMap();
+  });
+
   // ---------- Live board (free, OpenSky bbox) ----------
   function bearingDeg(lat1, lon1, lat2, lon2) {
     const toRad = (d) => (d * Math.PI) / 180;
@@ -128,6 +194,8 @@
     return d > 180 ? 360 - d : d;
   }
 
+  let consecutiveFailures = 0;
+
   async function refreshBoard() {
     if (!currentAirport) return;
     const a = currentAirport;
@@ -137,9 +205,16 @@
     let states;
     try {
       states = await OpenSky.fetchStatesInBbox(a.lat - latPad, a.lat + latPad, a.lon - lonPad, a.lon + lonPad);
+      consecutiveFailures = 0;
     } catch (err) {
       console.error(err);
-      boardList.innerHTML = '<p class="board-empty">Could not reach the OpenSky Network right now.</p>';
+      consecutiveFailures += 1;
+      const msg =
+        err.message === 'RATE_LIMIT'
+          ? "OpenSky's free anonymous tier is rate-limiting requests right now. This board will keep retrying automatically at a slower pace."
+          : 'Could not reach the OpenSky Network right now — this is usually temporary.';
+      boardList.innerHTML = `<p class="board-empty">${msg}</p>`;
+      boardUpdated.textContent = `Last attempt failed at ${new Date().toLocaleTimeString()}`;
       return;
     }
 
@@ -215,10 +290,11 @@
 
   function scheduleBoardRefresh() {
     clearTimeout(boardTimer);
+    const delay = Math.min(BOARD_REFRESH_MS * Math.pow(2, consecutiveFailures), 120000);
     boardTimer = setTimeout(async () => {
       await refreshBoard();
       scheduleBoardRefresh();
-    }, BOARD_REFRESH_MS);
+    }, delay);
   }
 
   // ---------- Optional schedule (AeroDataBox) ----------
@@ -264,20 +340,28 @@
   function openKeyModal() {
     keyInput.value = AeroDataBox.getKey();
     keyModal.hidden = false;
+    keyModal.style.display = 'flex';
+  }
+  function closeKeyModal() {
+    keyModal.hidden = true;
+    keyModal.style.display = 'none';
   }
   settingsBtn.addEventListener('click', openKeyModal);
   addKeyBtn.addEventListener('click', openKeyModal);
-  keyCancelBtn.addEventListener('click', () => (keyModal.hidden = true));
+  keyCancelBtn.addEventListener('click', closeKeyModal);
+  keyModal.addEventListener('click', (e) => {
+    if (e.target === keyModal) closeKeyModal();
+  });
   keySaveBtn.addEventListener('click', () => {
     AeroDataBox.setKey(keyInput.value);
-    keyModal.hidden = true;
+    closeKeyModal();
     resetSchedulePanel();
     if (currentAirport && AeroDataBox.hasKey()) loadSchedule(currentAirport);
   });
   keyClearBtn.addEventListener('click', () => {
     AeroDataBox.setKey('');
     keyInput.value = '';
-    keyModal.hidden = true;
+    closeKeyModal();
     resetSchedulePanel();
   });
 })();
