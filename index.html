@@ -32,6 +32,7 @@
     <span class="brand-name">VECTR</span>
   </div>
   <nav class="topnav">
+    <button id="navLiveMap" class="icon-btn" title="Live map — all traffic and airports">🗺 Live Map</button>
     <button id="navAirports" class="icon-btn" title="Airport departures &amp; arrivals">✈ Airports</button>
     <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle light/dark theme">◐</button>
     <a class="icon-btn" href="https://github.com/" id="ghLink" title="View source on GitHub" aria-label="View source on GitHub">GH</a>
@@ -161,6 +162,20 @@
     </div>
   </section>
 
+  <section class="livemap-view" id="liveMapView" hidden>
+    <div class="livemap-topbar">
+      <button id="liveMapBackBtn" class="back-btn livemap-back-btn">← Home</button>
+      <p id="liveMapStatus" class="livemap-status">Move the map to load live traffic in view.</p>
+    </div>
+    <div class="livemap-wrap">
+      <div id="liveMap"></div>
+      <aside id="liveMapPanel" class="livemap-panel" hidden>
+        <button id="liveMapPanelClose" class="chip-btn livemap-panel-close">✕ Close</button>
+        <div id="liveMapPanelContent"></div>
+      </aside>
+    </div>
+  </section>
+
   <div id="mapModal" class="modal" hidden>
     <div class="modal-card map-modal-card">
       <div class="map-modal-header">
@@ -204,5 +219,6 @@
 <script src="js/aerodatabox.js"></script>
 <script src="js/app.js"></script>
 <script src="js/airportview.js"></script>
+<script src="js/livemap.js"></script>
 </body>
 </html>

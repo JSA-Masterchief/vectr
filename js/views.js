@@ -14,6 +14,7 @@ const Views = (() => {
       hero: document.getElementById('heroSection'),
       app: document.getElementById('appView'),
       airport: document.getElementById('airportView'),
+      livemap: document.getElementById('liveMapView'),
       tip: document.getElementById('emptyTip'),
     };
   }
@@ -21,11 +22,12 @@ const Views = (() => {
   function show(name) {
     const e = els();
     // 'home' shows the hero + the "how search works" tip together.
-    // 'app' and 'airport' are full takeovers of the main area.
+    // 'app', 'airport', and 'livemap' are full takeovers of the main area.
     e.hero.hidden = name !== 'home';
     e.tip.hidden = name !== 'home';
     e.app.hidden = name !== 'app';
     e.airport.hidden = name !== 'airport';
+    e.livemap.hidden = name !== 'livemap';
   }
 
   return { show };

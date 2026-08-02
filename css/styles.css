@@ -337,6 +337,43 @@ a{color:var(--accent);}
 .modal-actions{display:flex; gap:8px; flex-wrap:wrap;}
 
 /* =========================================================
+   Live Map
+   ========================================================= */
+.livemap-view{
+  position:relative; z-index:2;
+  height:calc(100vh - 78px);
+  display:none;
+}
+.livemap-view:not([hidden]){display:flex; flex-direction:column;}
+
+.livemap-topbar{
+  display:flex; align-items:center; gap:16px; padding:12px 20px;
+  border-bottom:1px solid var(--line-soft); flex-wrap:wrap;
+}
+.livemap-back-btn{position:static;}
+.livemap-status{font-family:var(--font-mono); font-size:.8rem; color:var(--text-1); margin:0;}
+
+.livemap-wrap{position:relative; flex:1;}
+#liveMap{position:absolute; inset:0; background:var(--bg-2);}
+
+.livemap-panel{
+  position:absolute; top:16px; right:16px; bottom:16px; z-index:600;
+  width:320px; max-width:calc(100vw - 32px);
+  background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius);
+  padding:20px; box-shadow:var(--shadow-lift); overflow-y:auto;
+  display:none;
+}
+.livemap-panel h3{margin:0 0 8px; font-family:var(--font-display); font-size:1.1rem;}
+.livemap-panel-meta{font-size:.8rem; color:var(--text-1); margin:0 0 4px; font-family:var(--font-mono);}
+.livemap-panel-close{margin-bottom:14px;}
+.livemap-panel-action{width:100%; margin-top:16px;}
+.tele-grid-compact{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:14px;}
+.tele-grid-compact > div{background:var(--bg-2); border:1px solid var(--line); border-radius:8px; padding:8px 10px;}
+.tele-grid-compact .tele-label{display:block; font-size:.65rem; color:var(--text-2); text-transform:uppercase; margin-bottom:4px;}
+.tele-grid-compact .tele-value{font-family:var(--font-mono); font-weight:600; font-size:.85rem;}
+.livemap-plane{color:var(--accent); font-size:18px; line-height:1; filter: drop-shadow(0 0 4px rgba(45,217,196,.6));}
+
+/* =========================================================
    Responsive
    ========================================================= */
 @media (max-width: 880px){
@@ -352,4 +389,6 @@ a{color:var(--accent);}
   .board-row{grid-template-columns:1fr 1fr; row-gap:4px;}
   .schedule-table{font-size:.72rem;}
   .brand-name{display:none;}
+  .livemap-panel{left:16px; right:16px; width:auto;}
+  .livemap-topbar{padding:12px;}
 }

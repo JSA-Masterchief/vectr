@@ -364,4 +364,11 @@
     closeKeyModal();
     resetSchedulePanel();
   });
+
+  // Exposed so the Live Map view can open the full Airport Explorer
+  // for an airport a person clicked on the map.
+  window.VectrOpenAirport = async (airport) => {
+    Views.show('airport');
+    await selectAirport(airport);
+  };
 })();
