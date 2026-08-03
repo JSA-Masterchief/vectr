@@ -364,14 +364,17 @@ a{color:var(--accent);}
   display:none;
 }
 .livemap-panel h3{margin:0 0 8px; font-family:var(--font-display); font-size:1.1rem;}
-.livemap-panel-meta{font-size:.8rem; color:var(--text-1); margin:0 0 4px; font-family:var(--font-mono);}
 .livemap-panel-close{margin-bottom:14px;}
 .livemap-panel-action{width:100%; margin-top:16px;}
-.tele-grid-compact{display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:14px;}
-.tele-grid-compact > div{background:var(--bg-2); border:1px solid var(--line); border-radius:8px; padding:8px 10px;}
-.tele-grid-compact .tele-label{display:block; font-size:.65rem; color:var(--text-2); text-transform:uppercase; margin-bottom:4px;}
-.tele-grid-compact .tele-value{font-family:var(--font-mono); font-weight:600; font-size:.85rem;}
 .livemap-plane{color:var(--accent); font-size:18px; line-height:1; filter: drop-shadow(0 0 4px rgba(45,217,196,.6));}
+
+/* Marker cluster bubbles, restyled to match the design system
+   instead of the plugin's default yellow/orange look */
+.vectr-cluster{
+  background:var(--accent-dim); border:2px solid var(--accent);
+  border-radius:50%; display:flex; align-items:center; justify-content:center;
+  color:var(--accent); font-family:var(--font-mono); font-weight:700; font-size:.8rem;
+}
 
 /* =========================================================
    Responsive

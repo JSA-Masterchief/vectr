@@ -16,8 +16,10 @@
  *     the bounding box is a reasonable size, and are refetched
  *     (debounced + throttled) as you pan/zoom, not on a fixed
  *     timer independent of what you're actually looking at.
- * Marker clustering for dense airspace is a known follow-up, not
- * done here yet.
+ *   - Plane markers render through a Leaflet.markercluster group,
+ *     so dense airspace collapses into count bubbles instead of
+ *     hundreds of overlapping icons, and stays fast even with the
+ *     marker cap raised.
  * ------------------------------------------------------------
  */
 (() => {
@@ -31,13 +33,13 @@
   const panelCloseBtn = document.getElementById('liveMapPanelClose');
 
   const MIN_ZOOM_FOR_TRAFFIC = 6;
-  const MAX_PLANE_MARKERS = 300;
+  const MAX_PLANE_MARKERS = 800; // clustering handles density now, so this is just a sane upper safety cap
   const FETCH_DEBOUNCE_MS = 900;
   const MIN_FETCH_INTERVAL_MS = 8000;
 
   let map = null;
   let airportMarkers = [];
-  let planeMarkers = [];
+  let planeCluster = null;
   let moveDebounceTimer = null;
   let lastFetchTs = 0;
   let consecutiveFailures = 0;
@@ -66,6 +68,22 @@
     initialized = true;
     map = L.map('liveMap', { zoomControl: true, attributionControl: true }).setView([20, 20], 3);
     setTileLayer();
+
+    planeCluster = L.markerClusterGroup({
+      maxClusterRadius: 55,
+      spiderfyOnMaxZoom: true,
+      showCoverageOnHover: false,
+      iconCreateFunction: (cluster) => {
+        const count = cluster.getChildCount();
+        const size = count < 10 ? 32 : count < 50 ? 40 : 48;
+        return L.divIcon({
+          html: `<div class="vectr-cluster" style="width:${size}px;height:${size}px;">${count}</div>`,
+          className: '',
+          iconSize: L.point(size, size),
+        });
+      },
+    });
+    map.addLayer(planeCluster);
 
     map.on('moveend zoomend', () => {
       clearTimeout(moveDebounceTimer);
@@ -144,7 +162,7 @@
     const withPos = states.filter((f) => f.latitude != null && f.longitude != null);
     const shown = withPos.slice(0, MAX_PLANE_MARKERS);
 
-    shown.forEach((f) => {
+    const markers = shown.map((f) => {
       const marker = L.marker([f.latitude, f.longitude], {
         icon: L.divIcon({
           className: '',
@@ -152,12 +170,11 @@
           iconSize: [20, 20],
           iconAnchor: [10, 10],
         }),
-      })
-        .bindTooltip(f.callsign || 'Unknown', { permanent: false })
-        .addTo(map);
+      }).bindTooltip(f.callsign || 'Unknown', { permanent: false });
       marker.on('click', () => openPlanePanel(f));
-      planeMarkers.push(marker);
+      return marker;
     });
+    planeCluster.addLayers(markers);
 
     const capNote = withPos.length > MAX_PLANE_MARKERS
       ? ` (showing ${MAX_PLANE_MARKERS} of ${withPos.length} \u2014 zoom in further to narrow it down)`
@@ -166,8 +183,7 @@
   }
 
   function clearPlaneMarkers() {
-    planeMarkers.forEach((m) => map.removeLayer(m));
-    planeMarkers = [];
+    if (planeCluster) planeCluster.clearLayers();
   }
 
   // ---------- Side panel ----------
@@ -187,8 +203,8 @@
   function openAirportPanel(a) {
     openPanel(`
       <h3>${a.name}</h3>
-      <p class="livemap-panel-meta">${a.iata || ''}${a.iata && a.icao ? ' / ' : ''}${a.icao || ''} \u00b7 ${a.city || ''}, ${a.country || ''}</p>
-      <p class="livemap-panel-meta">${a.lat.toFixed(2)}\u00b0, ${a.lon.toFixed(2)}\u00b0 \u00b7 ${a.tz || ''}</p>
+      <p class="airport-meta">${a.iata || ''}${a.iata && a.icao ? ' / ' : ''}${a.icao || ''} \u00b7 ${a.city || ''}, ${a.country || ''}</p>
+      <p class="airport-meta">${a.lat.toFixed(2)}\u00b0, ${a.lon.toFixed(2)}\u00b0 \u00b7 ${a.tz || ''}</p>
       <button class="search-btn livemap-panel-action" id="livemapOpenAirportBtn">Open full Airport Explorer</button>
     `);
     document.getElementById('livemapOpenAirportBtn').addEventListener('click', () => {
@@ -203,11 +219,11 @@
     const heading = f.true_track != null ? `${Math.round(f.true_track)}\u00b0` : '—';
     openPanel(`
       <h3>${f.callsign || 'Unknown callsign'}</h3>
-      <p class="livemap-panel-meta">${f.origin_country || ''} \u00b7 ICAO24 ${f.icao24}</p>
-      <div class="tele-grid-compact">
-        <div><span class="tele-label">Altitude</span><span class="tele-value">${altFt} ft</span></div>
-        <div><span class="tele-label">Speed</span><span class="tele-value">${spdKt} kt</span></div>
-        <div><span class="tele-label">Heading</span><span class="tele-value">${heading}</span></div>
+      <p class="airport-meta">${f.origin_country || ''} \u00b7 ICAO24 ${f.icao24}</p>
+      <div class="telemetry-grid">
+        <div class="tele-card"><span class="tele-label">Altitude</span><span class="tele-value">${altFt} ft</span></div>
+        <div class="tele-card"><span class="tele-label">Speed</span><span class="tele-value">${spdKt} kt</span></div>
+        <div class="tele-card"><span class="tele-label">Heading</span><span class="tele-value">${heading}</span></div>
       </div>
       <button class="search-btn livemap-panel-action" id="livemapTrackBtn" ${f.callsign ? '' : 'disabled'}>Track this flight</button>
     `);
