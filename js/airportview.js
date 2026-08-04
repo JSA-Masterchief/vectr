@@ -45,6 +45,8 @@
   const mapModal = document.getElementById('mapModal');
   const mapModalTitle = document.getElementById('mapModalTitle');
   const mapModalCloseBtn = document.getElementById('mapModalCloseBtn');
+  const favoriteAirportBtn = document.getElementById('favoriteAirportBtn');
+  const shareAirportBtn = document.getElementById('shareAirportBtn');
 
   let fullMap = null;
   let fullMapMarkers = [];
@@ -66,7 +68,50 @@
   });
   airportBackBtn.addEventListener('click', () => {
     clearTimeout(boardTimer);
+    clearUrlParams();
     Views.show('home');
+  });
+
+  // ---------- Shareable URL params ----------
+  function setUrlParam(key, value) {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set(key, value);
+    window.history.replaceState({}, '', url);
+  }
+  function clearUrlParams() {
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState({}, '', url);
+  }
+
+  // ---------- Favorites + share ----------
+  function updateFavoriteButton() {
+    if (!currentAirport) return;
+    const code = currentAirport.iata || currentAirport.icao;
+    const fav = Favorites.isAirportFavorited(code);
+    favoriteAirportBtn.textContent = fav ? '★ Favorited' : '☆ Favorite';
+    favoriteAirportBtn.classList.toggle('active', fav);
+  }
+  favoriteAirportBtn.addEventListener('click', () => {
+    if (!currentAirport) return;
+    const code = currentAirport.iata || currentAirport.icao;
+    Favorites.toggleAirport(code, currentAirport.name);
+    updateFavoriteButton();
+    if (window.VectrRenderFavorites) window.VectrRenderFavorites();
+  });
+  shareAirportBtn.addEventListener('click', async () => {
+    if (!currentAirport) return;
+    const code = currentAirport.iata || currentAirport.icao;
+    setUrlParam('airport', code);
+    const original = shareAirportBtn.textContent;
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      shareAirportBtn.textContent = '✓ Link copied';
+    } catch {
+      shareAirportBtn.textContent = window.location.href;
+    }
+    setTimeout(() => (shareAirportBtn.textContent = original), 1800);
   });
 
   // ---------- Airport search ----------
@@ -95,6 +140,10 @@
     content.hidden = false;
     airportNameEl.textContent = `${airport.name} (${airport.iata || airport.icao})`;
     airportMetaEl.textContent = `${airport.city || ''}${airport.city ? ', ' : ''}${airport.country || ''} · ${airport.lat.toFixed(2)}°, ${airport.lon.toFixed(2)}° · ${airport.tz || ''}`;
+
+    const code = airport.iata || airport.icao;
+    setUrlParam('airport', code);
+    updateFavoriteButton();
 
     initMiniMap(airport);
     resetSchedulePanel();
@@ -370,5 +419,16 @@
   window.VectrOpenAirport = async (airport) => {
     Views.show('airport');
     await selectAirport(airport);
+  };
+
+  // Exposed for permalinks (?airport=LHR) and favorite chips, which
+  // only have a code string, not the full airport object.
+  window.VectrOpenAirportByCode = async (code) => {
+    await Airports.load();
+    const match = Airports.search(code);
+    if (match) {
+      Views.show('airport');
+      await selectAirport(match);
+    }
   };
 })();

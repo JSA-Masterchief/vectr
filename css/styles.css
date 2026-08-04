@@ -279,7 +279,8 @@ a{color:var(--accent);}
 .airport-back-btn{position:static;}
 .airport-tip{margin-top:8px;}
 
-.airport-header{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:16px;}
+.airport-header{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap;}
+.airport-header-actions{display:flex; gap:8px; flex-wrap:wrap;}
 .airport-header h2{font-family:var(--font-display); margin:0 0 4px; font-size:1.5rem;}
 .airport-meta{color:var(--text-1); font-size:.85rem; margin:0; font-family:var(--font-mono);}
 

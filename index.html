@@ -18,6 +18,9 @@
 
 <link rel="stylesheet" href="css/styles.css" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><text y=%2220%22 font-size=%2220%22>✈️</text></svg>">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#080B10">
 </head>
 <body data-theme="dark">
 
@@ -58,6 +61,11 @@
       <div id="historyChips" class="chips"></div>
     </div>
 
+    <div class="quick-row" id="favoritesRow">
+      <span class="quick-label">⭐ Favorites:</span>
+      <div id="favoriteChips" class="chips"></div>
+    </div>
+
     <div id="searchStatus" class="search-status" role="status" aria-live="polite"></div>
   </section>
 
@@ -67,6 +75,8 @@
       <div class="map-controls">
         <button id="recenterBtn" class="chip-btn">⌖ Recenter</button>
         <button id="autoRefreshBtn" class="chip-btn active">↻ Auto-refresh: On</button>
+        <button id="favoriteFlightBtn" class="chip-btn" title="Save to favorites">☆ Favorite</button>
+        <button id="shareFlightBtn" class="chip-btn" title="Copy a shareable link">🔗 Share</button>
         <span id="lastUpdated" class="last-updated"></span>
       </div>
       <button id="backBtn" class="back-btn">← New search</button>
@@ -137,7 +147,11 @@
           <h2 id="airportName">—</h2>
           <p id="airportMeta" class="airport-meta">—</p>
         </div>
-        <button id="airportSettingsBtn" class="chip-btn" title="Add optional schedule API key">⚙ Schedule key</button>
+        <div class="airport-header-actions">
+          <button id="airportSettingsBtn" class="chip-btn" title="Add optional schedule API key">⚙ Schedule key</button>
+          <button id="favoriteAirportBtn" class="chip-btn" title="Save to favorites">☆ Favorite</button>
+          <button id="shareAirportBtn" class="chip-btn" title="Copy a shareable link">🔗 Share</button>
+        </div>
       </div>
 
       <div class="mini-map-row">
@@ -216,6 +230,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="js/views.js"></script>
+<script src="js/favorites.js"></script>
 <script src="js/airports.js"></script>
 <script src="js/airlines.js"></script>
 <script src="js/opensky.js"></script>
@@ -223,5 +238,15 @@
 <script src="js/app.js"></script>
 <script src="js/airportview.js"></script>
 <script src="js/livemap.js"></script>
+<script src="js/permalink.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => {
+        console.warn('Vectr: service worker registration failed', err);
+      });
+    });
+  }
+</script>
 </body>
 </html>

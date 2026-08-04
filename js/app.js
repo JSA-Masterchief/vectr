@@ -19,6 +19,9 @@
   const backBtn = document.getElementById('backBtn');
   const recenterBtn = document.getElementById('recenterBtn');
   const autoRefreshBtn = document.getElementById('autoRefreshBtn');
+  const favoriteFlightBtn = document.getElementById('favoriteFlightBtn');
+  const shareFlightBtn = document.getElementById('shareFlightBtn');
+  const favoriteChips = document.getElementById('favoriteChips');
   const lastUpdatedEl = document.getElementById('lastUpdated');
   const themeToggle = document.getElementById('themeToggle');
 
@@ -42,6 +45,7 @@
   const INTERP_MS = 1000; // how often we nudge the marker between real fetches
   let map, marker, pathLine;
   let currentIcao24 = null;
+  let currentCallsign = null;
   let refreshTimer = null;
   let interpTimer = null;
   let autoRefreshOn = true;
@@ -95,6 +99,40 @@
     });
   }
   renderHistory();
+
+  function renderFavorites() {
+    const flights = Favorites.getFlights();
+    const airports = Favorites.getAirports();
+    favoriteChips.innerHTML = '';
+    if (!flights.length && !airports.length) {
+      favoriteChips.parentElement.style.display = 'none';
+      return;
+    }
+    favoriteChips.parentElement.style.display = 'flex';
+    flights.forEach((cs) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = `✈ ${cs}`;
+      chip.addEventListener('click', () => trackFlight(cs));
+      favoriteChips.appendChild(chip);
+    });
+    airports.forEach((a) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'chip';
+      chip.textContent = `🛫 ${a.code}`;
+      chip.title = a.name || '';
+      chip.addEventListener('click', () => {
+        if (window.VectrOpenAirportByCode) {
+          Views.show('airport');
+          window.VectrOpenAirportByCode(a.code);
+        }
+      });
+      favoriteChips.appendChild(chip);
+    });
+  }
+  renderFavorites();
 
   // ---------- Map ----------
   function initMap() {
@@ -319,6 +357,10 @@
   async function renderFlight(flight) {
     await Airports.load();
 
+    currentCallsign = flight.callsign || currentCallsign;
+    if (currentCallsign) setUrlParam('flight', currentCallsign);
+    updateFavoriteButton();
+
     renderFlap(flight.callsign || '——');
     flightSub.textContent = `${flight.origin_country || 'Unknown origin country'} · ICAO24 ${flight.icao24}`;
 
@@ -400,6 +442,44 @@
     }, REFRESH_MS);
   }
 
+  // ---------- Shareable URL params ----------
+  function setUrlParam(key, value) {
+    const url = new URL(window.location.href);
+    url.search = '';
+    url.searchParams.set(key, value);
+    window.history.replaceState({}, '', url);
+  }
+  function clearUrlParams() {
+    const url = new URL(window.location.href);
+    url.search = '';
+    window.history.replaceState({}, '', url);
+  }
+
+  // ---------- Favorites + share ----------
+  function updateFavoriteButton() {
+    const fav = currentCallsign && Favorites.isFlightFavorited(currentCallsign);
+    favoriteFlightBtn.textContent = fav ? '★ Favorited' : '☆ Favorite';
+    favoriteFlightBtn.classList.toggle('active', !!fav);
+  }
+  favoriteFlightBtn.addEventListener('click', () => {
+    if (!currentCallsign) return;
+    Favorites.toggleFlight(currentCallsign);
+    updateFavoriteButton();
+    renderFavorites();
+  });
+  shareFlightBtn.addEventListener('click', async () => {
+    if (!currentCallsign) return;
+    setUrlParam('flight', currentCallsign);
+    const shareText = shareFlightBtn.textContent;
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      shareFlightBtn.textContent = '✓ Link copied';
+    } catch {
+      shareFlightBtn.textContent = window.location.href;
+    }
+    setTimeout(() => (shareFlightBtn.textContent = shareText), 1800);
+  });
+
   // ---------- Events ----------
   searchForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -411,6 +491,8 @@
     clearInterval(interpTimer);
     lastKnown = null;
     currentIcao24 = null;
+    currentCallsign = null;
+    clearUrlParams();
     Views.show('home');
     searchInput.value = '';
     searchInput.focus();
@@ -421,4 +503,7 @@
   // Exposed so the Airport Explorer board can jump straight into
   // tracking a flight it found nearby.
   window.VectrTrackFlight = trackFlight;
+  // Exposed so airport favoriting (in airportview.js) can refresh
+  // this same home-screen favorites row.
+  window.VectrRenderFavorites = renderFavorites;
 })();
