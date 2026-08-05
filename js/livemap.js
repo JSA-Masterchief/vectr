@@ -134,7 +134,7 @@
     }
     const now = Date.now();
     if (!isInitial && now - lastFetchTs < MIN_FETCH_INTERVAL_MS) {
-      statusEl.textContent = 'Keeping requests polite to OpenSky\u2019s free tier \u2014 traffic will refresh shortly.';
+      statusEl.textContent = 'Keeping requests polite to the free live-data providers \u2014 traffic will refresh shortly.';
       return;
     }
     loadTraffic();
@@ -153,8 +153,8 @@
       consecutiveFailures += 1;
       statusEl.textContent =
         err.message === 'RATE_LIMIT'
-          ? "OpenSky's free tier is rate-limiting requests right now \u2014 retrying automatically at a slower pace."
-          : 'Could not reach the OpenSky Network right now \u2014 this is usually temporary.';
+          ? "Both free live-data providers are rate-limiting requests right now \u2014 retrying automatically at a slower pace."
+          : 'Could not reach either live data provider right now (tried OpenSky and adsb.lol) \u2014 this is usually temporary.';
       return;
     }
 

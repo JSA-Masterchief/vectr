@@ -329,7 +329,7 @@
       matches = await OpenSky.findByFlightNumber(candidates);
     } catch (err) {
       console.error(err);
-      searchStatus.textContent = 'Could not reach the OpenSky Network right now. It may be rate-limiting anonymous requests — try again shortly.';
+      searchStatus.textContent = 'Could not reach either live data provider right now (tried OpenSky and adsb.lol). This is usually temporary — try again shortly.';
       searchStatus.style.color = 'var(--red)';
       return;
     }

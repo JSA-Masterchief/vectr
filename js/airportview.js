@@ -260,8 +260,8 @@
       consecutiveFailures += 1;
       const msg =
         err.message === 'RATE_LIMIT'
-          ? "OpenSky's free anonymous tier is rate-limiting requests right now. This board will keep retrying automatically at a slower pace."
-          : 'Could not reach the OpenSky Network right now — this is usually temporary.';
+          ? "Both free live-data providers (OpenSky and adsb.lol) are rate-limiting requests right now. This board will keep retrying automatically at a slower pace."
+          : 'Could not reach either live data provider right now (tried OpenSky and adsb.lol) — this is usually temporary.';
       boardList.innerHTML = `<p class="board-empty">${msg}</p>`;
       boardUpdated.textContent = `Last attempt failed at ${new Date().toLocaleTimeString()}`;
       return;
