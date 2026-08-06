@@ -212,6 +212,7 @@ a{color:var(--accent);}
 }
 @keyframes flap{ from{ transform:rotateX(90deg); opacity:0;} to{ transform:rotateX(0deg); opacity:1;} }
 .flight-sub{color:var(--text-1); font-size:.88rem; margin-top:8px;}
+.aircraft-meta{color:var(--text-2); font-size:.8rem; margin-top:4px; font-family:var(--font-mono);}
 .status-pill{
   display:inline-block; margin-top:10px; font-family:var(--font-mono); font-size:.72rem;
   padding:4px 10px; border-radius:999px; background:var(--accent-dim); color:var(--accent);
