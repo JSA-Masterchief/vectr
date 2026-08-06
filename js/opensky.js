@@ -40,6 +40,15 @@ const OpenSky = (() => {
   let cache = { ts: 0, states: [] };
   let inflight = null;
 
+  // ---------- Status tracking (for the "live source" indicator in the UI) ----------
+  let lastStatus = { provider: null, ok: false, ts: 0 };
+  function reportStatus(provider, ok) {
+    lastStatus = { provider, ok, ts: Date.now() };
+  }
+  function getStatus() {
+    return lastStatus;
+  }
+
   async function fetchAllStatesFromOpenSky() {
     const now = Date.now();
     if (now - cache.ts < CACHE_MS) return cache.states;
@@ -95,12 +104,14 @@ const OpenSky = (() => {
   async function findByFlightNumber(candidates) {
     try {
       const states = await fetchAllStatesFromOpenSky();
+      reportStatus('opensky', true);
       return matchCandidates(states, candidates);
     } catch (openSkyErr) {
       console.warn('OpenSky failed, falling back to adsb.lol:', openSkyErr.message);
       try {
         const results = await Promise.all(candidates.map((c) => AdsbLol.findByCallsign(c).catch(() => [])));
         const merged = results.flat();
+        reportStatus('adsblol', true);
         // De-dupe by icao24 in case multiple candidates matched the
         // same aircraft (e.g. "BA15" and "BAW15" both hitting it).
         const seen = new Set();
@@ -111,6 +122,7 @@ const OpenSky = (() => {
         });
       } catch (fallbackErr) {
         console.error('adsb.lol fallback also failed:', fallbackErr.message);
+        reportStatus(null, false);
         throw openSkyErr; // surface the original error's message to the UI
       }
     }
@@ -126,13 +138,25 @@ const OpenSky = (() => {
     try {
       const states = await fetchAllStatesFromOpenSky();
       const found = states.find((f) => f.icao24 === icao24);
-      if (found) return found;
+      if (found) {
+        reportStatus('opensky', true);
+        return found;
+      }
       // Not in the current global snapshot (e.g. cache is stale) —
       // still worth trying adsb.lol directly before giving up.
-      return await AdsbLol.getByIcao24(icao24);
+      const fallback = await AdsbLol.getByIcao24(icao24);
+      reportStatus('adsblol', true);
+      return fallback;
     } catch (openSkyErr) {
       console.warn('OpenSky failed, falling back to adsb.lol:', openSkyErr.message);
-      return await AdsbLol.getByIcao24(icao24);
+      try {
+        const fallback = await AdsbLol.getByIcao24(icao24);
+        reportStatus('adsblol', true);
+        return fallback;
+      } catch (fallbackErr) {
+        reportStatus(null, false);
+        throw fallbackErr;
+      }
     }
   }
 
@@ -163,14 +187,21 @@ const OpenSky = (() => {
       const data = await res.json();
       const states = (data.states || []).map(rowToFlight);
       bboxCache.set(key, { ts: now, states });
+      reportStatus('opensky', true);
       return states;
     } catch (openSkyErr) {
       console.warn('OpenSky failed, falling back to adsb.lol:', openSkyErr.message);
-      const states = await AdsbLol.fetchStatesInBbox(latMin, latMax, lonMin, lonMax);
-      bboxCache.set(key, { ts: now, states });
-      return states;
+      try {
+        const states = await AdsbLol.fetchStatesInBbox(latMin, latMax, lonMin, lonMax);
+        bboxCache.set(key, { ts: now, states });
+        reportStatus('adsblol', true);
+        return states;
+      } catch (fallbackErr) {
+        reportStatus(null, false);
+        throw fallbackErr;
+      }
     }
   }
 
-  return { findByFlightNumber, getByIcao24, fetchStatesInBbox };
+  return { findByFlightNumber, getByIcao24, fetchStatesInBbox, getStatus };
 })();
