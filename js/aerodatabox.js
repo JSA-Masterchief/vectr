@@ -30,6 +30,7 @@ const AeroDataBox = (() => {
   function setKey(key) {
     if (key) localStorage.setItem(KEY_STORAGE, key.trim());
     else localStorage.removeItem(KEY_STORAGE);
+    cache.clear();
   }
   function hasKey() {
     return !!getKey();
@@ -40,15 +41,11 @@ const AeroDataBox = (() => {
     return d.toISOString().slice(0, 16);
   }
 
-  /**
-   * Fetches scheduled departures & arrivals for an airport (by
-   * ICAO code) in a window around now. Throws on missing key or
-   * HTTP failure so the caller can show a clear message.
-   */
-  async function getSchedule(icaoCode) {
-    const key = getKey();
-    if (!key) throw new Error('NO_KEY');
+  const cache = new Map();
+  const CACHE_MS = 5 * 60 * 1000; // 5 min - schedules don't change second-to-second, and this is a metered free tier
 
+  async function fetchOnce(icaoCode) {
+    const key = getKey();
     const fromLocal = isoLocal(0, -60); // 1h ago
     const toLocal = isoLocal(0, 360); // +6h
 
@@ -71,6 +68,38 @@ const AeroDataBox = (() => {
     const departures = (data.departures || []).map(normalizeFlight('departure'));
     const arrivals = (data.arrivals || []).map(normalizeFlight('arrival'));
     return { departures, arrivals };
+  }
+
+  /**
+   * Fetches scheduled departures & arrivals for an airport (by
+   * ICAO code) in a window around now. Cached for 5 minutes per
+   * airport (this is a metered free tier — no reason to spend a
+   * call every time someone reopens the same airport), and retries
+   * once after a short delay on a transient network failure (not
+   * on BAD_KEY or RATE_LIMIT, which retrying won't fix). Throws on
+   * missing key or a real HTTP failure so the caller can show a
+   * clear message.
+   */
+  async function getSchedule(icaoCode) {
+    const key = getKey();
+    if (!key) throw new Error('NO_KEY');
+
+    const cached = cache.get(icaoCode);
+    if (cached && Date.now() - cached.ts < CACHE_MS) return cached.data;
+
+    try {
+      const data = await fetchOnce(icaoCode);
+      cache.set(icaoCode, { ts: Date.now(), data });
+      return data;
+    } catch (err) {
+      if (err.message === 'BAD_KEY' || err.message === 'RATE_LIMIT') throw err;
+      // One retry after a short pause for anything else (likely a
+      // transient network blip), then give up and surface the error.
+      await new Promise((r) => setTimeout(r, 1500));
+      const data = await fetchOnce(icaoCode);
+      cache.set(icaoCode, { ts: Date.now(), data });
+      return data;
+    }
   }
 
   function normalizeFlight(kind) {
