@@ -108,6 +108,16 @@ a{color:var(--accent);}
 }
 .icon-btn:hover{border-color:var(--accent); color:var(--accent);}
 
+.data-status{
+  display:inline-flex; align-items:center; gap:6px;
+  height:36px; padding:0 12px; border-radius:999px; border:1px solid var(--line);
+  background:var(--bg-1); font-family:var(--font-mono); font-size:.72rem; color:var(--text-1);
+}
+.data-status-dot{width:8px; height:8px; border-radius:50%; background:var(--text-2); flex-shrink:0;}
+.data-status-dot.good{background:var(--accent); box-shadow:0 0 6px var(--accent);}
+.data-status-dot.warn{background:var(--amber); box-shadow:0 0 6px var(--amber);}
+.data-status-dot.bad{background:var(--red); box-shadow:0 0 6px var(--red);}
+
 /* =========================================================
    Hero
    ========================================================= */
