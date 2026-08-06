@@ -37,6 +37,10 @@
     <span class="brand-name">VECTR</span>
   </div>
   <nav class="topnav">
+    <span id="dataStatusIndicator" class="data-status" title="Live data source">
+      <span id="dataStatusDot" class="data-status-dot"></span>
+      <span id="dataStatusLabel" class="data-status-label">Checking…</span>
+    </span>
     <button id="navLiveMap" class="icon-btn" title="Live map — all traffic and airports">🗺 Live Map</button>
     <button id="navAirports" class="icon-btn" title="Airport departures &amp; arrivals">✈ Airports</button>
     <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle light/dark theme">◐</button>
@@ -235,6 +239,7 @@
 <script src="js/airlines.js"></script>
 <script src="js/adsblol.js"></script>
 <script src="js/opensky.js"></script>
+<script src="js/datastatus.js"></script>
 <script src="js/aerodatabox.js"></script>
 <script src="js/app.js"></script>
 <script src="js/airportview.js"></script>
