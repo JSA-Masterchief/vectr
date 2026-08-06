@@ -40,6 +40,9 @@ const AdsbLol = (() => {
       spi: false,
       position_source: 0,
       category: ac.category || null,
+      registration: ac.r || null,
+      aircraftType: ac.t || null,
+      aircraftDescription: ac.desc || null,
     };
   }
 
@@ -63,6 +66,33 @@ const AdsbLol = (() => {
     return list[0] || null;
   }
 
+  const metadataCache = new Map();
+
+  /**
+   * Looks up just the static aircraft info (registration + type) for
+   * an ICAO24 hex, regardless of which provider actually supplied
+   * the live position — this is purely supplemental and safe to
+   * fail quietly, since OpenSky doesn't offer this for free at all.
+   * Cached indefinitely per session since this data doesn't change.
+   */
+  async function getAircraftMetadata(icao24) {
+    if (metadataCache.has(icao24)) return metadataCache.get(icao24);
+    try {
+      const flight = await getByIcao24(icao24);
+      const meta = flight
+        ? {
+            registration: flight.registration,
+            aircraftType: flight.aircraftType,
+            aircraftDescription: flight.aircraftDescription,
+          }
+        : null;
+      metadataCache.set(icao24, meta);
+      return meta;
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * adsb.lol's public OpenAPI does bounding-circle queries (point +
    * radius in nautical miles), not bounding boxes, so bbox callers
@@ -83,5 +113,5 @@ const AdsbLol = (() => {
     return (data.ac || []).map(normalize);
   }
 
-  return { findByCallsign, getByIcao24, fetchStatesInBbox };
+  return { findByCallsign, getByIcao24, fetchStatesInBbox, getAircraftMetadata };
 })();
