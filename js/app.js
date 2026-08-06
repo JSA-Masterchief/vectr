@@ -27,6 +27,7 @@
 
   const flapCallsign = document.getElementById('flapCallsign');
   const flightSub = document.getElementById('flightSub');
+  const aircraftMetaEl = document.getElementById('aircraftMeta');
   const statusPill = document.getElementById('statusPill');
   const originCode = document.getElementById('originCode');
   const originCity = document.getElementById('originCity');
@@ -46,6 +47,7 @@
   let map, marker, pathLine;
   let currentIcao24 = null;
   let currentCallsign = null;
+  let metadataFetchedFor = null;
   let refreshTimer = null;
   let interpTimer = null;
   let autoRefreshOn = true;
@@ -354,6 +356,27 @@
     scheduleRefresh();
   }
 
+  // ---------- Aircraft type/registration (adsb.lol only, optional/supplemental) ----------
+  async function maybeLoadAircraftMeta(icao24) {
+    if (!icao24 || metadataFetchedFor === icao24) return;
+    metadataFetchedFor = icao24;
+    aircraftMetaEl.hidden = true;
+    try {
+      const meta = await AdsbLol.getAircraftMetadata(icao24);
+      // Guard against a stale response landing after the person
+      // already moved on to tracking a different flight.
+      if (!meta || metadataFetchedFor !== icao24) return;
+      const parts = [meta.aircraftDescription || meta.aircraftType, meta.registration].filter(Boolean);
+      if (parts.length) {
+        aircraftMetaEl.textContent = parts.join(' · ');
+        aircraftMetaEl.hidden = false;
+      }
+    } catch {
+      // Silent failure is fine here — this is purely supplemental
+      // info, not core to tracking the flight.
+    }
+  }
+
   async function renderFlight(flight) {
     await Airports.load();
 
@@ -363,6 +386,7 @@
 
     renderFlap(flight.callsign || '——');
     flightSub.textContent = `${flight.origin_country || 'Unknown origin country'} · ICAO24 ${flight.icao24}`;
+    maybeLoadAircraftMeta(flight.icao24);
 
     if (flight.on_ground) {
       statusPill.textContent = 'ON GROUND';
@@ -492,6 +516,8 @@
     lastKnown = null;
     currentIcao24 = null;
     currentCallsign = null;
+    metadataFetchedFor = null;
+    aircraftMetaEl.hidden = true;
     clearUrlParams();
     Views.show('home');
     searchInput.value = '';
