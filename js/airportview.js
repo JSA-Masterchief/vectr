@@ -258,10 +258,7 @@
     } catch (err) {
       console.error(err);
       consecutiveFailures += 1;
-      const msg =
-        err.message === 'RATE_LIMIT'
-          ? "Both free live-data providers (OpenSky and adsb.lol) are rate-limiting requests right now. This board will keep retrying automatically at a slower pace."
-          : 'Could not reach either live data provider right now (tried OpenSky and adsb.lol) — this is usually temporary.';
+      const msg = Views.describeDualFailure(err) + ' This board will keep retrying automatically at a slower pace.';
       boardList.innerHTML = `<p class="board-empty">${msg}</p>`;
       boardUpdated.textContent = `Last attempt failed at ${new Date().toLocaleTimeString()}`;
       return;
