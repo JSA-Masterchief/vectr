@@ -24,9 +24,11 @@
     if (!status.provider || !status.ok || age > STALE_MS) {
       dot.className = 'data-status-dot bad';
       label.textContent = status.ts ? 'Reconnecting…' : 'No live data yet';
+      dot.parentElement.title = status.detail || 'Live data source';
       return;
     }
 
+    dot.parentElement.title = 'Live data source';
     if (status.provider === 'opensky') {
       dot.className = 'data-status-dot good';
       label.textContent = 'Live: OpenSky';
