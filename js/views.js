@@ -30,5 +30,29 @@ const Views = (() => {
     e.livemap.hidden = name !== 'livemap';
   }
 
-  return { show };
+  const REASON_LABELS = {
+    RATE_LIMIT: 'rate-limited',
+    NETWORK_OR_CORS: 'unreachable from this browser (network/CORS)',
+  };
+  function labelFor(reason) {
+    return REASON_LABELS[reason] || `error (${reason})`;
+  }
+
+  /**
+   * Turns an OpenSky.DualFailureError into a precise message naming
+   * what actually happened to each provider, instead of a generic
+   * "something's wrong" line. Falls back to a generic message for
+   * any other error shape.
+   */
+  function describeDualFailure(err) {
+    if (err && err.name === 'DualFailureError') {
+      if (err.isRateLimit) {
+        return "Both free live-data providers (OpenSky and adsb.lol) are rate-limiting requests right now. Try again shortly.";
+      }
+      return `OpenSky is ${labelFor(err.openSkyReason)}; adsb.lol is ${labelFor(err.adsbLolReason)}. This is usually temporary.`;
+    }
+    return 'Could not reach live flight data right now — this is usually temporary. Try again shortly.';
+  }
+
+  return { show, describeDualFailure };
 })();
