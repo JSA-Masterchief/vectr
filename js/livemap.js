@@ -151,10 +151,7 @@
     } catch (err) {
       console.error(err);
       consecutiveFailures += 1;
-      statusEl.textContent =
-        err.message === 'RATE_LIMIT'
-          ? "Both free live-data providers are rate-limiting requests right now \u2014 retrying automatically at a slower pace."
-          : 'Could not reach either live data provider right now (tried OpenSky and adsb.lol) \u2014 this is usually temporary.';
+      statusEl.textContent = Views.describeDualFailure(err);
       return;
     }
 
