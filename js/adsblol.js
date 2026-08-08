@@ -16,6 +16,16 @@
  */
 const AdsbLol = (() => {
   const BASE = 'https://api.adsb.lol/v2';
+  const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+
+  async function robustFetch(url) {
+    try {
+      return await fetch(url);
+    } catch (networkErr) {
+      console.warn(`adsb.lol direct fetch failed (${networkErr.name}: ${networkErr.message}), retrying via CORS proxy`);
+      return await fetch(CORS_PROXY + encodeURIComponent(url));
+    }
+  }
 
   function normalize(ac) {
     const onGround = ac.alt_baro === 'ground';
@@ -47,9 +57,9 @@ const AdsbLol = (() => {
   }
 
   async function fetchJson(url) {
-    const res = await fetch(url);
+    const res = await robustFetch(url);
     if (res.status === 429) throw new Error('RATE_LIMIT');
-    if (!res.ok) throw new Error(`adsb.lol responded ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP_${res.status}`);
     return res.json();
   }
 
