@@ -230,7 +230,21 @@
 
 <footer class="site-footer">
   <p>Vectr is free &amp; open source. Flight data via <a href="https://opensky-network.org/" target="_blank" rel="noopener">The OpenSky Network</a>. Map tiles via <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a> / OpenStreetMap. Not for operational or safety-critical use.</p>
+  <button id="diagnosticsLink" class="diagnostics-link" type="button">🩺 Not seeing live data? Run a connection test</button>
 </footer>
+
+<div id="diagnosticsModal" class="modal" hidden>
+  <div class="modal-card diagnostics-modal-card">
+    <div class="map-modal-header">
+      <h3>Connection diagnostics</h3>
+      <button id="diagnosticsCloseBtn" class="chip-btn">✕ Close</button>
+    </div>
+    <p class="diagnostics-intro">Tests each live-data path directly, bypassing caching, so you can see exactly what's reachable from this browser right now.</p>
+    <div id="diagnosticsResults" class="diagnostics-results"></div>
+    <button id="diagnosticsRunBtn" class="search-btn">Run test</button>
+  </div>
+</div>
+
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -246,6 +260,7 @@
 <script src="js/airportview.js"></script>
 <script src="js/livemap.js"></script>
 <script src="js/permalink.js"></script>
+<script src="js/diagnostics.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
