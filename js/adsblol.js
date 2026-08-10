@@ -17,13 +17,27 @@
 const AdsbLol = (() => {
   const BASE = 'https://api.adsb.lol/v2';
   const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+  const REQUEST_TIMEOUT_MS = 10000;
+
+  async function fetchWithTimeout(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      return await fetch(url, { signal: controller.signal });
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('TIMEOUT');
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
 
   async function robustFetch(url) {
     try {
-      return await fetch(url);
+      return await fetchWithTimeout(url);
     } catch (networkErr) {
-      console.warn(`adsb.lol direct fetch failed (${networkErr.name}: ${networkErr.message}), retrying via CORS proxy`);
-      return await fetch(CORS_PROXY + encodeURIComponent(url));
+      console.warn(`adsb.lol direct fetch failed (${networkErr.message}), retrying via CORS proxy`);
+      return await fetchWithTimeout(CORS_PROXY + encodeURIComponent(url));
     }
   }
 
