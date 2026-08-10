@@ -44,6 +44,8 @@ const AeroDataBox = (() => {
   const cache = new Map();
   const CACHE_MS = 5 * 60 * 1000; // 5 min - schedules don't change second-to-second, and this is a metered free tier
 
+  const REQUEST_TIMEOUT_MS = 10000;
+
   async function fetchOnce(icaoCode) {
     const key = getKey();
     const fromLocal = isoLocal(0, -60); // 1h ago
@@ -53,12 +55,23 @@ const AeroDataBox = (() => {
       icaoCode
     )}/${fromLocal}/${toLocal}?withLeg=true&direction=Both&withCancelled=true&withCodeshared=true&withCargo=false&withPrivate=false`;
 
-    const res = await fetch(url, {
-      headers: {
-        'X-RapidAPI-Key': key,
-        'X-RapidAPI-Host': 'aerodatabox.p.rapidapi.com',
-      },
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let res;
+    try {
+      res = await fetch(url, {
+        headers: {
+          'X-RapidAPI-Key': key,
+          'X-RapidAPI-Host': 'aerodatabox.p.rapidapi.com',
+        },
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('TIMEOUT');
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
 
     if (res.status === 401 || res.status === 403) throw new Error('BAD_KEY');
     if (res.status === 429) throw new Error('RATE_LIMIT');
