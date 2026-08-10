@@ -33,6 +33,7 @@ const Views = (() => {
   const REASON_LABELS = {
     RATE_LIMIT: 'rate-limited',
     NETWORK_OR_CORS: 'unreachable from this browser (network/CORS)',
+    TIMEOUT: 'timed out (no response in 10s)',
   };
   function labelFor(reason) {
     return REASON_LABELS[reason] || `error (${reason})`;
