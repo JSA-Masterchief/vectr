@@ -363,6 +363,7 @@
       let msg = 'Could not load the schedule right now.';
       if (err.message === 'BAD_KEY') msg = 'That AeroDataBox key was rejected — check it in Schedule key settings.';
       if (err.message === 'RATE_LIMIT') msg = "You've hit your AeroDataBox free-tier limit for now — try again later.";
+      if (err.message === 'TIMEOUT') msg = 'AeroDataBox took too long to respond — try again shortly.';
       scheduleContent.innerHTML = `<p class="board-empty">${msg}</p>`;
     }
   }
