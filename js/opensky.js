@@ -31,6 +31,7 @@ const OpenSky = (() => {
   // network/CORS error (a TypeError from fetch()), not for normal
   // HTTP error responses (429/4xx/5xx), which a proxy won't fix.
   const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+  const REQUEST_TIMEOUT_MS = 10000;
 
   // OpenSky state vector column order, per their API docs.
   const COLS = [
@@ -60,12 +61,31 @@ const OpenSky = (() => {
 
   function describeError(err) {
     if (err.message === 'RATE_LIMIT') return 'RATE_LIMIT';
+    if (err.message === 'TIMEOUT') return 'TIMEOUT';
     // A fetch() TypeError ("Failed to fetch", "NetworkError...") is
     // the classic browser-side symptom of a CORS block or genuine
     // connectivity failure — worth distinguishing from a clean HTTP
     // error status the server actually sent back.
     if (err.name === 'TypeError') return 'NETWORK_OR_CORS';
     return err.message || 'UNKNOWN_ERROR';
+  }
+
+  /**
+   * fetch() with a hard timeout. Without this, a hung connection
+   * (common with flaky free APIs/proxies) would leave the UI stuck
+   * on "Searching…" forever with no error ever surfacing.
+   */
+  async function fetchWithTimeout(url) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      return await fetch(url, { signal: controller.signal });
+    } catch (err) {
+      if (err.name === 'AbortError') throw new Error('TIMEOUT');
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /**
@@ -76,10 +96,10 @@ const OpenSky = (() => {
    */
   async function robustFetch(url) {
     try {
-      return await fetch(url);
+      return await fetchWithTimeout(url);
     } catch (networkErr) {
-      console.warn(`Direct fetch failed (${networkErr.name}: ${networkErr.message}), retrying via CORS proxy for:`, url);
-      return await fetch(CORS_PROXY + encodeURIComponent(url));
+      console.warn(`Direct fetch failed (${networkErr.message}), retrying via CORS proxy for:`, url);
+      return await fetchWithTimeout(CORS_PROXY + encodeURIComponent(url));
     }
   }
 
