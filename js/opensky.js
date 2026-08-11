@@ -26,11 +26,18 @@
 const OpenSky = (() => {
   const STATES_URL = 'https://opensky-network.org/api/states/all';
   const CACHE_MS = 9000; // don't hammer the API faster than this
-  // A free, keyless CORS proxy, used ONLY as a last resort when a
-  // direct fetch fails with what looks like a browser-level
-  // network/CORS error (a TypeError from fetch()), not for normal
-  // HTTP error responses (429/4xx/5xx), which a proxy won't fix.
-  const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+  // Several free, keyless CORS proxies, tried in sequence as a last
+  // resort when a direct fetch fails with what looks like a
+  // browser-level network/CORS error. Any one of these can be down,
+  // rate-limited, or itself blocked on a given network — trying
+  // several instead of just one meaningfully raises the odds that
+  // at least one gets through. Not tried for normal HTTP error
+  // responses (429/4xx/5xx), which a proxy can't fix.
+  const CORS_PROXIES = [
+    (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
+    (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
   const REQUEST_TIMEOUT_MS = 10000;
 
   // OpenSky state vector column order, per their API docs.
@@ -89,17 +96,27 @@ const OpenSky = (() => {
   }
 
   /**
-   * fetch() that retries once through a public CORS proxy if the
-   * direct request fails with a network/CORS-shaped error. HTTP
-   * error responses (the server answered, just with a 429/4xx/5xx)
-   * are NOT retried this way, since a proxy can't fix those.
+   * fetch() that retries through each CORS proxy in sequence if the
+   * direct request fails with a network/CORS-shaped error. Stops at
+   * the first proxy that succeeds. HTTP error responses (the server
+   * answered, just with a 429/4xx/5xx) are NOT retried this way,
+   * since a proxy can't fix those.
    */
   async function robustFetch(url) {
     try {
       return await fetchWithTimeout(url);
-    } catch (networkErr) {
-      console.warn(`Direct fetch failed (${networkErr.message}), retrying via CORS proxy for:`, url);
-      return await fetchWithTimeout(CORS_PROXY + encodeURIComponent(url));
+    } catch (directErr) {
+      console.warn(`Direct fetch failed (${directErr.message}) for ${url} \u2014 trying ${CORS_PROXIES.length} proxies in sequence`);
+      let lastErr = directErr;
+      for (const buildProxyUrl of CORS_PROXIES) {
+        try {
+          return await fetchWithTimeout(buildProxyUrl(url));
+        } catch (proxyErr) {
+          console.warn(`Proxy attempt failed (${proxyErr.message})`);
+          lastErr = proxyErr;
+        }
+      }
+      throw lastErr;
     }
   }
 
