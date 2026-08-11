@@ -16,7 +16,11 @@
  */
 const AdsbLol = (() => {
   const BASE = 'https://api.adsb.lol/v2';
-  const CORS_PROXY = 'https://api.codetabs.com/v1/proxy/?quest=';
+  const CORS_PROXIES = [
+    (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
+    (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  ];
   const REQUEST_TIMEOUT_MS = 10000;
 
   async function fetchWithTimeout(url) {
@@ -35,9 +39,18 @@ const AdsbLol = (() => {
   async function robustFetch(url) {
     try {
       return await fetchWithTimeout(url);
-    } catch (networkErr) {
-      console.warn(`adsb.lol direct fetch failed (${networkErr.message}), retrying via CORS proxy`);
-      return await fetchWithTimeout(CORS_PROXY + encodeURIComponent(url));
+    } catch (directErr) {
+      console.warn(`adsb.lol direct fetch failed (${directErr.message}) \u2014 trying ${CORS_PROXIES.length} proxies in sequence`);
+      let lastErr = directErr;
+      for (const buildProxyUrl of CORS_PROXIES) {
+        try {
+          return await fetchWithTimeout(buildProxyUrl(url));
+        } catch (proxyErr) {
+          console.warn(`Proxy attempt failed (${proxyErr.message})`);
+          lastErr = proxyErr;
+        }
+      }
+      throw lastErr;
     }
   }
 
