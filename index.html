@@ -24,6 +24,11 @@
 </head>
 <body data-theme="dark">
 
+<div id="moduleErrorBanner" class="module-error-banner" hidden>
+  <span id="moduleErrorText"></span>
+  <button id="moduleErrorDetailsBtn" class="module-error-link">See details</button>
+</div>
+
 <div class="radar-bg" aria-hidden="true">
   <div class="radar-sweep"></div>
   <div class="radar-ring r1"></div>
@@ -258,6 +263,11 @@
         <li>Try a different browser (e.g. Chrome vs Firefox vs Safari) to rule out a browser-specific block</li>
         <li>Check whether a VPN, corporate proxy, or router-level DNS filter is active</li>
       </ul>
+    </div>
+
+    <div class="diagnostics-manual">
+      <p class="diagnostics-manual-label">Module check — confirms every script actually loaded, before even touching the network. Runs automatically.</p>
+      <div id="moduleCheckResults" class="diagnostics-results"></div>
     </div>
   </div>
 </div>
