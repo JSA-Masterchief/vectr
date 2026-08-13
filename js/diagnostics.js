@@ -26,6 +26,72 @@
   const runBtn = document.getElementById('diagnosticsRunBtn');
   const resultsEl = document.getElementById('diagnosticsResults');
   const summaryEl = document.getElementById('diagnosticsSummary');
+  const moduleResultsEl = document.getElementById('moduleCheckResults');
+  const banner = document.getElementById('moduleErrorBanner');
+  const bannerText = document.getElementById('moduleErrorText');
+  const bannerDetailsBtn = document.getElementById('moduleErrorDetailsBtn');
+
+  // ---------- Module integrity check ----------
+  // Runs immediately on page load, before any network request. With
+  // this many separate script files (each day's patch adding more),
+  // a missed file, wrong path, or wrong <script> order in index.html
+  // is a real and likely failure mode — one that would otherwise get
+  // misdiagnosed as a network/CORS problem, since a broken reference
+  // like `AdsbLol.findByCallsign` on an undefined `AdsbLol` throws a
+  // TypeError, which looks identical to a real CORS failure. This
+  // check catches that class of bug directly instead.
+  const REQUIRED_MODULES = [
+    { name: 'Views', check: () => typeof Views !== 'undefined' && typeof Views.show === 'function', file: 'js/views.js' },
+    { name: 'Favorites', check: () => typeof Favorites !== 'undefined' && typeof Favorites.getFlights === 'function', file: 'js/favorites.js' },
+    { name: 'Airports', check: () => typeof Airports !== 'undefined' && typeof Airports.search === 'function', file: 'js/airports.js' },
+    { name: 'Airlines', check: () => typeof Airlines !== 'undefined' && typeof Airlines.expandQuery === 'function', file: 'js/airlines.js' },
+    { name: 'AdsbLol', check: () => typeof AdsbLol !== 'undefined' && typeof AdsbLol.findByCallsign === 'function', file: 'js/adsblol.js' },
+    { name: 'OpenSky', check: () => typeof OpenSky !== 'undefined' && typeof OpenSky.findByFlightNumber === 'function', file: 'js/opensky.js' },
+    { name: 'AeroDataBox', check: () => typeof AeroDataBox !== 'undefined' && typeof AeroDataBox.getSchedule === 'function', file: 'js/aerodatabox.js' },
+  ];
+
+  function runModuleCheck() {
+    const results = REQUIRED_MODULES.map((m) => {
+      let ok = false;
+      try {
+        ok = m.check();
+      } catch {
+        ok = false;
+      }
+      return { ...m, ok };
+    });
+
+    if (moduleResultsEl) {
+      moduleResultsEl.innerHTML = '';
+      results.forEach((r) => {
+        const row = document.createElement('div');
+        row.className = 'diag-row';
+        row.innerHTML = `
+          <span class="diag-icon ${r.ok ? 'good' : 'bad'}">${r.ok ? '✅' : '❌'}</span>
+          <span class="diag-label">${r.name}</span>
+          <span class="diag-detail">${r.ok ? 'Loaded' : `Missing — check ${r.file}`}</span>
+        `;
+        moduleResultsEl.appendChild(row);
+      });
+    }
+
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length) {
+      const fileList = failed.map((f) => f.file).join(', ');
+      bannerText.textContent = `⚠️ Vectr didn't load correctly — missing or broken: ${failed.map((f) => f.name).join(', ')}. Check that ${fileList} ${failed.length > 1 ? 'are' : 'is'} present and in the right place in your repo.`;
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
+    }
+    return failed;
+  }
+
+  bannerDetailsBtn.addEventListener('click', () => {
+    openModal();
+  });
+
+  // Run immediately — don't wait for the modal to be opened.
+  runModuleCheck();
 
   const CORS_PROXIES = [
     { name: 'codetabs', build: (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}` },
