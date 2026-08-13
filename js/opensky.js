@@ -69,6 +69,12 @@ const OpenSky = (() => {
   function describeError(err) {
     if (err.message === 'RATE_LIMIT') return 'RATE_LIMIT';
     if (err.message === 'TIMEOUT') return 'TIMEOUT';
+    // A broken/missing dependency (e.g. adsblol.js didn't load, or
+    // loaded after opensky.js) throws a TypeError that looks
+    // identical to a real network failure otherwise — check for it
+    // by name so a deployment problem doesn't get misdiagnosed as a
+    // network/CORS issue.
+    if (typeof AdsbLol === 'undefined') return 'ADSBLOL_MODULE_MISSING';
     // A fetch() TypeError ("Failed to fetch", "NetworkError...") is
     // the classic browser-side symptom of a CORS block or genuine
     // connectivity failure — worth distinguishing from a clean HTTP
