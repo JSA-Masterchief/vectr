@@ -34,6 +34,7 @@ const Views = (() => {
     RATE_LIMIT: 'rate-limited',
     NETWORK_OR_CORS: 'unreachable from this browser (network/CORS)',
     TIMEOUT: 'timed out (no response in 10s)',
+    ADSBLOL_MODULE_MISSING: "couldn't load — check js/adsblol.js is present and loaded before js/opensky.js",
   };
   function labelFor(reason) {
     return REASON_LABELS[reason] || `error (${reason})`;
