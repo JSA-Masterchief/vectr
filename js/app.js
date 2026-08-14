@@ -238,9 +238,10 @@
   // ---------- Split-flap callsign header ----------
   function renderFlap(text) {
     flapCallsign.innerHTML = '';
-    text.split('').forEach((ch) => {
+    text.split('').forEach((ch, i) => {
       const span = document.createElement('span');
       span.className = 'flap-char';
+      span.style.animationDelay = `${i * 45}ms`;
       span.textContent = ch;
       flapCallsign.appendChild(span);
     });
