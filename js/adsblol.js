@@ -40,17 +40,14 @@ const AdsbLol = (() => {
     try {
       return await fetchWithTimeout(url);
     } catch (directErr) {
-      console.warn(`adsb.lol direct fetch failed (${directErr.message}) \u2014 trying ${CORS_PROXIES.length} proxies in sequence`);
-      let lastErr = directErr;
-      for (const buildProxyUrl of CORS_PROXIES) {
-        try {
-          return await fetchWithTimeout(buildProxyUrl(url));
-        } catch (proxyErr) {
-          console.warn(`Proxy attempt failed (${proxyErr.message})`);
-          lastErr = proxyErr;
-        }
+      console.warn(`adsb.lol direct fetch failed (${directErr.message}) \u2014 racing ${CORS_PROXIES.length} proxies in parallel`);
+      try {
+        return await Promise.any(CORS_PROXIES.map((buildProxyUrl) => fetchWithTimeout(buildProxyUrl(url))));
+      } catch (aggregateErr) {
+        const reasons = (aggregateErr.errors || []).map((e) => e.message).join(', ');
+        console.warn(`All proxies failed: ${reasons}`);
+        throw directErr;
       }
-      throw lastErr;
     }
   }
 
