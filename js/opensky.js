@@ -3,36 +3,43 @@
  * ------------------------------------------------------------
  * Thin wrapper around The OpenSky Network's public REST API,
  * with automatic fallback to adsb.lol (see adsblol.js), and a
- * further fallback through a public CORS proxy if a request
- * fails with what looks like a browser-level network/CORS error
- * rather than a clean HTTP error from the server itself.
+ * further fallback that races several public CORS proxies in
+ * parallel if a request fails with what looks like a browser-level
+ * network/CORS error rather than a clean HTTP error from the
+ * server itself.
  *
- * IMPORTANT FIX vs the previous version: when both providers
- * failed, this used to always re-throw OpenSky's error message,
- * discarding adsb.lol's actual failure reason. That made "both
- * providers broken" look identical to "OpenSky broken" in the UI,
- * which made real diagnosis impossible. This version surfaces
- * both reasons distinctly (see DualFailureError below) so the
- * on-screen message — and the browser console — actually says
- * what happened to each provider.
+ * DAY 20 FIX — the actual bug behind "diagnostics says it should
+ * work, but nothing loads": findByFlightNumber() and getByIcao24()
+ * used to call OpenSky's /states/all with NO bounding box at all —
+ * fetching every aircraft on Earth (a multi-megabyte response) just
+ * to filter it down to one callsign or one hex client-side. That's
+ * wasteful even directly, and free CORS proxies choke on payloads
+ * that size even when they handle small test pings fine — which is
+ * exactly why the diagnostics panel's lightweight test could pass
+ * while the real search kept failing/hanging.
+ *
+ * Fixed by flipping the order for these two lookups specifically:
+ * adsb.lol's targeted callsign/hex endpoints (small, fast, exactly
+ * what's needed) are now tried FIRST, with OpenSky's full global
+ * list only used as a last-resort fallback. fetchStatesInBbox()
+ * (Airport Explorer / Live Map) was never affected by this — it
+ * already scopes every query to a bounding box.
  *
  * The public function names/signatures here
  * (`findByFlightNumber`, `getByIcao24`, `fetchStatesInBbox`) are
- * what app.js / airportview.js / livemap.js call — kept stable
- * on purpose so swapping/adding providers never requires touching
+ * what app.js / airportview.js / livemap.js call — kept stable on
+ * purpose so swapping/adding providers never requires touching
  * those files.
  * ------------------------------------------------------------
  */
 const OpenSky = (() => {
   const STATES_URL = 'https://opensky-network.org/api/states/all';
   const CACHE_MS = 9000; // don't hammer the API faster than this
-  // Several free, keyless CORS proxies, tried in sequence as a last
+  // Several free, keyless CORS proxies, raced in parallel as a last
   // resort when a direct fetch fails with what looks like a
-  // browser-level network/CORS error. Any one of these can be down,
-  // rate-limited, or itself blocked on a given network — trying
-  // several instead of just one meaningfully raises the odds that
-  // at least one gets through. Not tried for normal HTTP error
-  // responses (429/4xx/5xx), which a proxy can't fix.
+  // browser-level network/CORS error. Racing (not trying one at a
+  // time) means a single slow/dead proxy never delays a request
+  // past however long the fastest working one takes.
   const CORS_PROXIES = [
     (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
     (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
@@ -58,7 +65,7 @@ const OpenSky = (() => {
   /** Carries BOTH providers' failure reasons, instead of hiding one. */
   class DualFailureError extends Error {
     constructor(openSkyReason, adsbLolReason) {
-      super(`OpenSky: ${openSkyReason} · adsb.lol: ${adsbLolReason}`);
+      super(`OpenSky: ${openSkyReason} \u00b7 adsb.lol: ${adsbLolReason}`);
       this.name = 'DualFailureError';
       this.openSkyReason = openSkyReason;
       this.adsbLolReason = adsbLolReason;
@@ -104,14 +111,7 @@ const OpenSky = (() => {
   /**
    * fetch() that, if the direct request fails with a network/CORS
    * error, races ALL CORS proxies in parallel and returns whichever
-   * responds first — rather than trying them one at a time. Trying
-   * them sequentially meant a single slow/dead proxy tried first
-   * (observed: one specific proxy consistently timing out at 10s for
-   * some networks) delayed every request by the full timeout before
-   * ever reaching a proxy that actually works. Racing them means a
-   * fast, working proxy wins immediately regardless of what order
-   * they're listed in, and a dead one just gets ignored once it
-   * eventually times out in the background.
+   * responds first, rather than trying them one at a time.
    */
   async function robustFetch(url) {
     try {
@@ -140,6 +140,12 @@ const OpenSky = (() => {
     return lastStatus;
   }
 
+  /**
+   * Fetches OpenSky's ENTIRE global state list. Expensive (multi-MB
+   * response) — only ever used as a last-resort fallback now (see
+   * the Day 20 fix note at the top of this file), never as the
+   * first thing tried for a single-flight lookup.
+   */
   async function fetchAllStatesFromOpenSky() {
     const now = Date.now();
     if (now - cache.ts < CACHE_MS) return cache.states;
@@ -185,73 +191,83 @@ const OpenSky = (() => {
 
   /**
    * Finds live flights matching any of several candidate callsign
-   * patterns. Tries OpenSky first; on failure, falls back to
-   * adsb.lol. If BOTH fail, throws a DualFailureError carrying both
-   * real reasons rather than masking one.
+   * patterns. Tries adsb.lol's targeted per-callsign lookup FIRST
+   * (small, fast response) — only falls back to downloading
+   * OpenSky's entire global state list if every candidate lookup
+   * fails there. If BOTH fail, throws a DualFailureError carrying
+   * both real reasons rather than masking one.
    */
   async function findByFlightNumber(candidates) {
-    let openSkyReason = null;
+    let adsbLolReason = null;
     try {
-      const states = await fetchAllStatesFromOpenSky();
-      reportStatus('opensky', true);
-      return matchCandidates(states, candidates);
-    } catch (openSkyErr) {
-      openSkyReason = describeError(openSkyErr);
-      console.warn('OpenSky failed:', openSkyReason, '— falling back to adsb.lol');
+      const settled = await Promise.allSettled(candidates.map((c) => AdsbLol.findByCallsign(c)));
+      const fulfilled = settled.filter((r) => r.status === 'fulfilled');
+      if (!fulfilled.length) {
+        const firstRejection = settled.find((r) => r.status === 'rejected');
+        throw firstRejection.reason;
+      }
+      const merged = fulfilled.flatMap((r) => r.value);
+      reportStatus('adsblol', true);
+      const seen = new Set();
+      const matches = merged.filter((f) => {
+        if (seen.has(f.icao24)) return false;
+        seen.add(f.icao24);
+        return true;
+      });
+      if (matches.length) return matches;
+      // adsb.lol answered successfully but genuinely found nothing —
+      // still worth trying OpenSky's full list before reporting "no
+      // matches", in case adsb.lol just doesn't have this aircraft.
+      throw new Error('NO_MATCH');
+    } catch (adsbErr) {
+      adsbLolReason = describeError(adsbErr);
+      if (adsbErr.message !== 'NO_MATCH') {
+        console.warn('adsb.lol failed:', adsbLolReason, '\u2014 falling back to OpenSky\u2019s full state list');
+      }
       try {
-        const settled = await Promise.allSettled(candidates.map((c) => AdsbLol.findByCallsign(c)));
-        const fulfilled = settled.filter((r) => r.status === 'fulfilled');
-        if (!fulfilled.length) {
-          // Every candidate lookup failed - throw the first real reason.
-          const firstRejection = settled.find((r) => r.status === 'rejected');
-          throw firstRejection.reason;
+        const states = await fetchAllStatesFromOpenSky();
+        reportStatus('opensky', true);
+        return matchCandidates(states, candidates);
+      } catch (openSkyErr) {
+        const openSkyReason = describeError(openSkyErr);
+        console.error('OpenSky fallback also failed:', openSkyReason);
+        reportStatus(null, false, `adsb.lol: ${adsbLolReason}, OpenSky: ${openSkyReason}`);
+        if (adsbLolReason === 'NO_MATCH') {
+          // adsb.lol had no data AND OpenSky failed outright - surface
+          // the OpenSky failure, since "no match" isn't really a
+          // failure worth alarming about on its own.
+          throw new DualFailureError(openSkyReason, 'no match found');
         }
-        const merged = fulfilled.flatMap((r) => r.value);
-        reportStatus('adsblol', true);
-        const seen = new Set();
-        return merged.filter((f) => {
-          if (seen.has(f.icao24)) return false;
-          seen.add(f.icao24);
-          return true;
-        });
-      } catch (fallbackErr) {
-        const adsbLolReason = describeError(fallbackErr);
-        console.error('adsb.lol fallback also failed:', adsbLolReason);
-        reportStatus(null, false, `OpenSky: ${openSkyReason}, adsb.lol: ${adsbLolReason}`);
         throw new DualFailureError(openSkyReason, adsbLolReason);
       }
     }
   }
 
   /**
-   * Looks up one aircraft by its ICAO24 hex address. Tries
-   * OpenSky's cached global state list first, falls back to
-   * adsb.lol's direct hex lookup.
+   * Looks up one aircraft by its ICAO24 hex address (used to
+   * refresh the currently tracked flight). Tries adsb.lol's direct
+   * hex lookup first (targeted, fast), falls back to OpenSky's
+   * cached global state list only if that fails.
    */
   async function getByIcao24(icao24) {
-    let openSkyReason = null;
+    let adsbLolReason = null;
     try {
-      const states = await fetchAllStatesFromOpenSky();
-      const found = states.find((f) => f.icao24 === icao24);
-      if (found) {
-        reportStatus('opensky', true);
-        return found;
-      }
-      // Not in the current global snapshot — still worth trying
-      // adsb.lol directly before giving up.
-      const fallback = await AdsbLol.getByIcao24(icao24);
-      reportStatus('adsblol', true);
-      return fallback;
-    } catch (openSkyErr) {
-      openSkyReason = describeError(openSkyErr);
-      console.warn('OpenSky failed:', openSkyReason, '— falling back to adsb.lol');
-      try {
-        const fallback = await AdsbLol.getByIcao24(icao24);
+      const flight = await AdsbLol.getByIcao24(icao24);
+      if (flight) {
         reportStatus('adsblol', true);
-        return fallback;
-      } catch (fallbackErr) {
-        const adsbLolReason = describeError(fallbackErr);
-        reportStatus(null, false, `OpenSky: ${openSkyReason}, adsb.lol: ${adsbLolReason}`);
+        return flight;
+      }
+      throw new Error('NO_MATCH');
+    } catch (adsbErr) {
+      adsbLolReason = describeError(adsbErr);
+      try {
+        const states = await fetchAllStatesFromOpenSky();
+        const found = states.find((f) => f.icao24 === icao24);
+        reportStatus('opensky', true);
+        return found || null;
+      } catch (openSkyErr) {
+        const openSkyReason = describeError(openSkyErr);
+        reportStatus(null, false, `adsb.lol: ${adsbLolReason}, OpenSky: ${openSkyReason}`);
         throw new DualFailureError(openSkyReason, adsbLolReason);
       }
     }
@@ -264,9 +280,10 @@ const OpenSky = (() => {
   const BBOX_CACHE_MS = 9000;
 
   /**
-   * Fetches state vectors within a bounding box. Tries OpenSky's
-   * own bbox query first, falls back to adsb.lol's point+radius
-   * query if OpenSky fails.
+   * Fetches state vectors within a bounding box — always scoped, so
+   * this was never affected by the Day 20 "unbounded fetch" bug.
+   * Tries OpenSky's own bbox query first, falls back to adsb.lol's
+   * point+radius query if OpenSky fails.
    */
   async function fetchStatesInBbox(latMin, latMax, lonMin, lonMax) {
     const key = [latMin, latMax, lonMin, lonMax].map((n) => n.toFixed(2)).join(',');
@@ -287,7 +304,7 @@ const OpenSky = (() => {
       return states;
     } catch (openSkyErr) {
       openSkyReason = describeError(openSkyErr);
-      console.warn('OpenSky failed:', openSkyReason, '— falling back to adsb.lol');
+      console.warn('OpenSky failed:', openSkyReason, '\u2014 falling back to adsb.lol');
       try {
         const states = await AdsbLol.fetchStatesInBbox(latMin, latMax, lonMin, lonMax);
         bboxCache.set(key, { ts: now, states });
