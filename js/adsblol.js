@@ -3,9 +3,13 @@
  * ------------------------------------------------------------
  * Wrapper around adsb.lol's public OpenAPI (https://api.adsb.lol),
  * a free, keyless, community-run ADS-B network, ADSBExchange v2
- * format-compatible. Used as an automatic fallback in opensky.js
- * when OpenSky itself fails (CORS, rate limit, outage, etc.) —
- * see opensky.js for the actual provider-selection logic.
+ * format-compatible. As of Day 20, this is the PRIMARY path for
+ * single-flight lookups (findByFlightNumber / getByIcao24 in
+ * opensky.js) — its targeted callsign/hex endpoints return small,
+ * fast responses, unlike OpenSky's unbounded global state list,
+ * which chokes free CORS proxies on anything but a trivial test
+ * query. OpenSky remains primary for bounding-box queries (Airport
+ * Explorer / Live Map), which were never affected by that issue.
  *
  * adsb.lol's response units differ from OpenSky's (feet/knots/
  * feet-per-minute vs meters/m-per-second), so every function here
@@ -100,14 +104,31 @@ const AdsbLol = (() => {
     return list[0] || null;
   }
 
+  /**
+   * adsb.lol's public OpenAPI does bounding-circle queries (point +
+   * radius in nautical miles), not bounding boxes, so bbox callers
+   * convert to a center point + radius that covers the box.
+   */
+  async function fetchStatesInBbox(latMin, latMax, lonMin, lonMax) {
+    const centerLat = (latMin + latMax) / 2;
+    const centerLon = (lonMin + lonMax) / 2;
+    const kmPerDegLat = 111.32;
+    const kmPerDegLon = 111.32 * Math.cos((centerLat * Math.PI) / 180);
+    const halfLatKm = ((latMax - latMin) / 2) * kmPerDegLat;
+    const halfLonKm = ((lonMax - lonMin) / 2) * Math.max(kmPerDegLon, 1);
+    const radiusKm = Math.sqrt(halfLatKm ** 2 + halfLonKm ** 2);
+    const radiusNm = Math.min(Math.max(radiusKm * 0.539957, 5), 250);
+
+    const data = await fetchJson(`${BASE}/point/${centerLat.toFixed(4)}/${centerLon.toFixed(4)}/${Math.round(radiusNm)}`);
+    return (data.ac || []).map(normalize);
+  }
+
   const metadataCache = new Map();
 
   /**
    * Looks up just the static aircraft info (registration + type) for
    * an ICAO24 hex, regardless of which provider actually supplied
-   * the live position — this is purely supplemental and safe to
-   * fail quietly, since OpenSky doesn't offer this for free at all.
-   * Cached indefinitely per session since this data doesn't change.
+   * the live position. Cached indefinitely per session.
    */
   async function getAircraftMetadata(icao24) {
     if (metadataCache.has(icao24)) return metadataCache.get(icao24);
@@ -125,26 +146,6 @@ const AdsbLol = (() => {
     } catch {
       return null;
     }
-  }
-
-  /**
-   * adsb.lol's public OpenAPI does bounding-circle queries (point +
-   * radius in nautical miles), not bounding boxes, so bbox callers
-   * convert to a center point + radius that covers the box.
-   */
-  async function fetchStatesInBbox(latMin, latMax, lonMin, lonMax) {
-    const centerLat = (latMin + latMax) / 2;
-    const centerLon = (lonMin + lonMax) / 2;
-    // Rough km-per-degree at this latitude, then to nautical miles.
-    const kmPerDegLat = 111.32;
-    const kmPerDegLon = 111.32 * Math.cos((centerLat * Math.PI) / 180);
-    const halfLatKm = ((latMax - latMin) / 2) * kmPerDegLat;
-    const halfLonKm = ((lonMax - lonMin) / 2) * Math.max(kmPerDegLon, 1);
-    const radiusKm = Math.sqrt(halfLatKm ** 2 + halfLonKm ** 2);
-    const radiusNm = Math.min(Math.max(radiusKm * 0.539957, 5), 250); // adsb.lol caps radius; keep it sane
-
-    const data = await fetchJson(`${BASE}/point/${centerLat.toFixed(4)}/${centerLon.toFixed(4)}/${Math.round(radiusNm)}`);
-    return (data.ac || []).map(normalize);
   }
 
   return { findByCallsign, getByIcao24, fetchStatesInBbox, getAircraftMetadata };
