@@ -109,7 +109,7 @@
       await navigator.clipboard.writeText(window.location.href);
       shareAirportBtn.textContent = '✓ Link copied';
     } catch {
-      shareAirportBtn.textContent = window.location.href;
+      shareAirportBtn.textContent = "Couldn't copy — use your browser's address bar";
     }
     setTimeout(() => (shareAirportBtn.textContent = original), 1800);
   });
@@ -298,7 +298,8 @@
   function renderBoard() {
     const rows = lastClassified[currentTab] || [];
     if (!rows.length) {
-      boardList.innerHTML = `<p class="board-empty">No aircraft currently classified as "${currentTab}" within range. Try again shortly, or pick a busier hub.</p>`;
+      const tabLabels = { arrivals: 'likely arrivals', departures: 'likely departures', nearby: 'nearby traffic' };
+      boardList.innerHTML = `<p class="board-empty">No ${tabLabels[currentTab] || currentTab} right now. Try again shortly, or pick a busier hub.</p>`;
       return;
     }
     boardList.innerHTML = '';
