@@ -23,6 +23,30 @@
   --shadow-lift: 0 20px 60px -20px rgba(0,0,0,0.6);
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-snap: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Type scale - named by role, not just size, so headings across
+     different components (modal titles, panel titles, page titles)
+     actually line up instead of drifting to whatever felt right in
+     the moment. */
+  --text-2xs: .68rem;
+  --text-xs: .72rem;
+  --text-sm: .8rem;
+  --text-base: .88rem;
+  --text-md: 1rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.3rem;
+  --text-2xl: 1.5rem;
+  --text-display: clamp(2.1rem, 5vw, 3.4rem);
+
+  /* Spacing scale - 4px baseline */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
 }
 
 [data-theme="light"]{
@@ -167,7 +191,7 @@ a{color:var(--accent);}
 }
 .hero h1{
   font-family:var(--font-display); font-weight:700;
-  font-size:clamp(2.1rem, 5vw, 3.4rem); line-height:1.08; margin:0 0 18px;
+  font-size:var(--text-display); line-height:1.08; margin:0 0 18px;
 }
 .hero-sub{color:var(--text-1); font-size:1.02rem; line-height:1.6; margin:0 auto 34px; max-width:520px;}
 
@@ -318,7 +342,7 @@ a{color:var(--accent);}
 
 .empty-tip{position:relative; z-index:2; max-width:640px; margin:8px auto 60px; padding:0 24px;}
 .tip-card{background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius); padding:18px 20px;}
-.tip-card h3{margin:0 0 8px; font-family:var(--font-display); font-size:1rem;}
+.tip-card h3{margin:0 0 8px; font-family:var(--font-display); font-size:var(--text-md);}
 .tip-card p{margin:0; color:var(--text-1); font-size:.88rem; line-height:1.6;}
 .tip-card code{font-family:var(--font-mono); background:var(--bg-2); padding:1px 6px; border-radius:4px;}
 
@@ -368,7 +392,7 @@ a{color:var(--accent);}
 
 .airport-header{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:16px; flex-wrap:wrap;}
 .airport-header-actions{display:flex; gap:8px; flex-wrap:wrap;}
-.airport-header h2{font-family:var(--font-display); margin:0 0 4px; font-size:1.5rem;}
+.airport-header h2{font-family:var(--font-display); margin:0 0 4px; font-size:var(--text-2xl);}
 .airport-meta{color:var(--text-1); font-size:.85rem; margin:0; font-family:var(--font-mono);}
 
 .mini-map-row{position:relative; margin-bottom:20px;}
@@ -377,7 +401,7 @@ a{color:var(--accent);}
 
 .map-modal-card{max-width:min(1100px, 92vw); width:100%; padding:16px;}
 .map-modal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
-.map-modal-header h3{margin:0;}
+.map-modal-header h3{margin:0; font-family:var(--font-display); font-size:var(--text-lg);}
 .full-map{height:min(75vh, 700px); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
 
 .board-tabs{display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;}
@@ -409,7 +433,7 @@ a{color:var(--accent);}
 .schedule-gate{background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius); padding:18px; text-align:left;}
 .schedule-gate p{color:var(--text-1); font-size:.88rem; line-height:1.6; margin:0 0 14px;}
 .schedule-block{margin-bottom:20px;}
-.schedule-block h4{font-family:var(--font-display); font-size:.95rem; margin:0 0 10px;}
+.schedule-block h4{font-family:var(--font-display); font-size:var(--text-base); margin:0 0 10px;}
 .schedule-table{width:100%; border-collapse:collapse; font-size:.82rem;}
 .schedule-table th{text-align:left; color:var(--text-2); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; padding:6px 10px; border-bottom:1px solid var(--line);}
 .schedule-table td{padding:8px 10px; border-bottom:1px solid var(--line-soft); font-family:var(--font-mono); color:var(--text-0);}
@@ -427,7 +451,7 @@ a{color:var(--accent);}
 @media (prefers-reduced-motion: reduce){
   .modal:not([hidden]), .modal-card{ animation:none; }
 }
-.modal-card h3{margin:0 0 10px; font-family:var(--font-display);}
+.modal-card h3{margin:0 0 10px; font-family:var(--font-display); font-size:var(--text-lg);}
 .modal-card p{color:var(--text-1); font-size:.85rem; line-height:1.6; margin:0 0 14px;}
 .modal-card input{
   width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line);
@@ -463,7 +487,7 @@ a{color:var(--accent);}
   padding:20px; box-shadow:var(--shadow-lift); overflow-y:auto;
   display:none;
 }
-.livemap-panel h3{margin:0 0 8px; font-family:var(--font-display); font-size:1.1rem;}
+.livemap-panel h3{margin:0 0 8px; font-family:var(--font-display); font-size:var(--text-lg);}
 .livemap-panel-close{margin-bottom:14px;}
 .livemap-panel-action{width:100%; margin-top:16px;}
 .livemap-plane{color:var(--accent); font-size:18px; line-height:1; filter: drop-shadow(0 0 4px rgba(45,217,196,.6));}
