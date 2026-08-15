@@ -1,28 +1,26 @@
 /**
  * diagnostics.js
  * ------------------------------------------------------------
- * A self-contained connection test, deliberately bypassing
- * opensky.js/adsblol.js's own caching and fallback logic, so it
- * shows the true, current reachability of each path from this
- * exact browser — the same information you'd otherwise have to
- * dig for in DevTools' Network/Console tabs.
+ * Connection diagnostics, now a full page view (Day 20) instead
+ * of a modal — the modal ran out of room and things overlapped
+ * once the module-check section was added. Same tests as before:
  *
- * Tests, in order:
- *   1. OpenSky direct
- *   2. OpenSky via the CORS proxy
- *   3. adsb.lol direct
- *   4. adsb.lol via the CORS proxy
- * Each reports: pass/fail, latency, and the precise failure
- * reason (HTTP status, or the browser's own error name/message
- * for network/CORS failures).
+ *   1. Module integrity check — runs immediately on page load,
+ *      before any network request, so a missing/misplaced file
+ *      doesn't get misdiagnosed as a network problem.
+ *   2. A control test (a well-known, always-up API) to tell
+ *      "these specific providers are broken" apart from "this
+ *      browser/network blocks cross-origin requests generally."
+ *   3. OpenSky and adsb.lol direct.
+ *   4. Each CORS proxy individually.
+ *   5. Manual direct-open links (bypass fetch()/CORS entirely).
  * ------------------------------------------------------------
  */
 (() => {
   'use strict';
 
-  const link = document.getElementById('diagnosticsLink');
-  const modal = document.getElementById('diagnosticsModal');
-  const closeBtn = document.getElementById('diagnosticsCloseBtn');
+  const navBtn = document.getElementById('navDiagnostics');
+  const backBtn = document.getElementById('diagnosticsBackBtn');
   const runBtn = document.getElementById('diagnosticsRunBtn');
   const resultsEl = document.getElementById('diagnosticsResults');
   const summaryEl = document.getElementById('diagnosticsSummary');
@@ -31,15 +29,16 @@
   const bannerText = document.getElementById('moduleErrorText');
   const bannerDetailsBtn = document.getElementById('moduleErrorDetailsBtn');
 
+  navBtn.addEventListener('click', () => {
+    Views.show('diagnostics');
+    if (!resultsEl.children.length) runTests();
+  });
+  bannerDetailsBtn.addEventListener('click', () => Views.show('diagnostics'));
+  if (backBtn) {
+    backBtn.addEventListener('click', () => Views.show('home'));
+  }
+
   // ---------- Module integrity check ----------
-  // Runs immediately on page load, before any network request. With
-  // this many separate script files (each day's patch adding more),
-  // a missed file, wrong path, or wrong <script> order in index.html
-  // is a real and likely failure mode — one that would otherwise get
-  // misdiagnosed as a network/CORS problem, since a broken reference
-  // like `AdsbLol.findByCallsign` on an undefined `AdsbLol` throws a
-  // TypeError, which looks identical to a real CORS failure. This
-  // check catches that class of bug directly instead.
   const REQUIRED_MODULES = [
     { name: 'Views', check: () => typeof Views !== 'undefined' && typeof Views.show === 'function', file: 'js/views.js' },
     { name: 'Favorites', check: () => typeof Favorites !== 'undefined' && typeof Favorites.getFlights === 'function', file: 'js/favorites.js' },
@@ -49,6 +48,17 @@
     { name: 'OpenSky', check: () => typeof OpenSky !== 'undefined' && typeof OpenSky.findByFlightNumber === 'function', file: 'js/opensky.js' },
     { name: 'AeroDataBox', check: () => typeof AeroDataBox !== 'undefined' && typeof AeroDataBox.getSchedule === 'function', file: 'js/aerodatabox.js' },
   ];
+
+  function diagRow(name, ok, detail) {
+    const row = document.createElement('div');
+    row.className = 'diag-row';
+    row.innerHTML = `
+      <span class="diag-icon ${ok ? 'good' : 'bad'}">${ok ? '\u2705' : '\u274c'}</span>
+      <span class="diag-label">${name}</span>
+      <span class="diag-detail">${detail}</span>
+    `;
+    return row;
+  }
 
   function runModuleCheck() {
     const results = REQUIRED_MODULES.map((m) => {
@@ -64,21 +74,14 @@
     if (moduleResultsEl) {
       moduleResultsEl.innerHTML = '';
       results.forEach((r) => {
-        const row = document.createElement('div');
-        row.className = 'diag-row';
-        row.innerHTML = `
-          <span class="diag-icon ${r.ok ? 'good' : 'bad'}">${r.ok ? '✅' : '❌'}</span>
-          <span class="diag-label">${r.name}</span>
-          <span class="diag-detail">${r.ok ? 'Loaded' : `Missing — check ${r.file}`}</span>
-        `;
-        moduleResultsEl.appendChild(row);
+        moduleResultsEl.appendChild(diagRow(r.name, r.ok, r.ok ? 'Loaded' : `Missing \u2014 check ${r.file}`));
       });
     }
 
     const failed = results.filter((r) => !r.ok);
     if (failed.length) {
       const fileList = failed.map((f) => f.file).join(', ');
-      bannerText.textContent = `⚠️ Vectr didn't load correctly — missing or broken: ${failed.map((f) => f.name).join(', ')}. Check that ${fileList} ${failed.length > 1 ? 'are' : 'is'} present and in the right place in your repo.`;
+      bannerText.textContent = `\u26a0\ufe0f Vectr didn't load correctly \u2014 missing or broken: ${failed.map((f) => f.name).join(', ')}. Check that ${fileList} ${failed.length > 1 ? 'are' : 'is'} present and in the right place in your repo.`;
       banner.hidden = false;
     } else {
       banner.hidden = true;
@@ -86,42 +89,16 @@
     return failed;
   }
 
-  bannerDetailsBtn.addEventListener('click', () => {
-    openModal();
-  });
-
-  // Run immediately — don't wait for the modal to be opened.
   runModuleCheck();
 
+  // ---------- Network tests ----------
   const CORS_PROXIES = [
     { name: 'codetabs', build: (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}` },
     { name: 'corsproxy.io', build: (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}` },
     { name: 'allorigins', build: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
   ];
   const TIMEOUT_MS = 10000;
-  // A well-known, always-up, definitely-CORS-enabled API, used as a
-  // control: if THIS also fails, the problem isn't OpenSky/adsb.lol
-  // specifically — it's something blocking cross-origin requests
-  // from this browser/network entirely (a privacy extension,
-  // corporate firewall, DNS filtering, etc.), which no change to
-  // Vectr's code can fix.
   const CONTROL_URL = 'https://api.github.com';
-
-  function openModal() {
-    modal.hidden = false;
-    modal.style.display = 'flex';
-    if (!resultsEl.children.length) runTests();
-  }
-  function closeModal() {
-    modal.hidden = true;
-    modal.style.display = 'none';
-  }
-  link.addEventListener('click', openModal);
-  closeBtn.addEventListener('click', closeModal);
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
-  });
-  runBtn.addEventListener('click', runTests);
 
   async function timedFetch(url) {
     const controller = new AbortController();
@@ -131,9 +108,6 @@
       const res = await fetch(url, { signal: controller.signal });
       const ms = Math.round(performance.now() - start);
       if (!res.ok) return { ok: false, ms, detail: `HTTP ${res.status}` };
-      // Confirm the body actually parses as JSON, not just that the
-      // request "succeeded" - a proxy can return HTTP 200 with an
-      // error page body, which would otherwise look like a pass.
       await res.json();
       return { ok: true, ms, detail: `HTTP ${res.status}` };
     } catch (err) {
@@ -146,37 +120,22 @@
   }
 
   const TESTS = [
-    { label: 'Control — api.github.com (known-good)', url: CONTROL_URL },
-    { label: 'OpenSky — direct', url: 'https://opensky-network.org/api/states/all?lamin=51&lamax=52&lomin=0&lomax=1' },
-    { label: 'adsb.lol — direct', url: 'https://api.adsb.lol/v2/callsign/VECTR' },
-    ...CORS_PROXIES.map((p) => ({ label: `Proxy — ${p.name}`, url: p.build(CONTROL_URL) })),
+    { label: 'Control \u2014 api.github.com (known-good)', url: CONTROL_URL },
+    { label: 'OpenSky \u2014 direct', url: 'https://opensky-network.org/api/states/all?lamin=51&lamax=52&lomin=0&lomax=1' },
+    { label: 'adsb.lol \u2014 direct', url: 'https://api.adsb.lol/v2/callsign/VECTR' },
+    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name}`, url: p.build(CONTROL_URL) })),
   ];
-
-  function renderRow(label) {
-    const row = document.createElement('div');
-    row.className = 'diag-row';
-    row.innerHTML = `
-      <span class="diag-icon">⏳</span>
-      <span class="diag-label">${label}</span>
-      <span class="diag-detail">Testing…</span>
-    `;
-    return row;
-  }
-
-  function updateRow(row, result) {
-    row.querySelector('.diag-icon').textContent = result.ok ? '✅' : '❌';
-    row.querySelector('.diag-icon').className = `diag-icon ${result.ok ? 'good' : 'bad'}`;
-    row.querySelector('.diag-detail').textContent = `${result.detail} · ${result.ms}ms`;
-  }
 
   async function runTests() {
     resultsEl.innerHTML = '';
     summaryEl.textContent = '';
     runBtn.disabled = true;
-    runBtn.textContent = 'Running…';
+    runBtn.textContent = 'Running\u2026';
 
     const rows = TESTS.map((t) => {
-      const row = renderRow(t.label);
+      const row = diagRow(t.label, true, 'Testing\u2026');
+      row.querySelector('.diag-icon').textContent = '\u23f3';
+      row.querySelector('.diag-icon').className = 'diag-icon';
       resultsEl.appendChild(row);
       return row;
     });
@@ -184,7 +143,9 @@
     const results = await Promise.all(
       TESTS.map(async (t, i) => {
         const result = await timedFetch(t.url);
-        updateRow(rows[i], result);
+        rows[i].querySelector('.diag-icon').textContent = result.ok ? '\u2705' : '\u274c';
+        rows[i].querySelector('.diag-icon').className = `diag-icon ${result.ok ? 'good' : 'bad'}`;
+        rows[i].querySelector('.diag-detail').textContent = `${result.detail} \u00b7 ${result.ms}ms`;
         return { label: t.label, ...result };
       })
     );
@@ -203,15 +164,17 @@
 
     if (!control.ok) {
       summaryEl.textContent =
-        '⚠️ Even the control test (a well-known, always-up API) failed. This points to something blocking cross-origin requests on this specific browser or network — a privacy extension, corporate/school firewall, or DNS filtering — rather than a Vectr or provider problem. Try a different network, a different browser, or temporarily disabling extensions (ad blockers/privacy tools) to confirm.';
+        '\u26a0\ufe0f Even the control test (a well-known, always-up API) failed. This points to something blocking cross-origin requests on this specific browser or network \u2014 a privacy extension, corporate/school firewall, or DNS filtering \u2014 rather than a Vectr or provider problem. Try a different network, a different browser, or temporarily disabling extensions to confirm.';
     } else if (!openSky.ok && !adsbLol.ok && !anyProxyOk) {
       summaryEl.textContent =
-        '⚠️ The control test passed, but OpenSky, adsb.lol, AND every proxy failed. These specific services may be down or blocked on this network right now — worth trying again later or from a different network.';
+        '\u26a0\ufe0f The control test passed, but OpenSky, adsb.lol, AND every proxy failed. These specific services may be down or blocked on this network right now \u2014 worth trying again later or from a different network.';
     } else if (!openSky.ok && !adsbLol.ok && anyProxyOk) {
       summaryEl.textContent =
-        '✅ At least one proxy works, which Vectr will use automatically. OpenSky and adsb.lol direct connections are currently blocked here (likely CORS or network-level), but live data should still load via the working proxy.';
+        '\u2705 At least one proxy works, which Vectr will use automatically (racing all of them in parallel, so a slow/dead one never holds up a working one). OpenSky and adsb.lol direct connections are currently blocked here, but live data should load via the working proxy.';
     } else {
-      summaryEl.textContent = '✅ At least one live-data path is working directly — Vectr should be showing live data.';
+      summaryEl.textContent = '\u2705 At least one live-data path is working directly \u2014 Vectr should be showing live data.';
     }
   }
+
+  runBtn.addEventListener('click', runTests);
 })();
