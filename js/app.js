@@ -500,7 +500,7 @@
       await navigator.clipboard.writeText(window.location.href);
       shareFlightBtn.textContent = '✓ Link copied';
     } catch {
-      shareFlightBtn.textContent = window.location.href;
+      shareFlightBtn.textContent = "Couldn't copy — use your browser's address bar";
     }
     setTimeout(() => (shareFlightBtn.textContent = shareText), 1800);
   });
