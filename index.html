@@ -6,12 +6,10 @@
 <title>Vectr — Live Flight Tracker</title>
 <meta name="description" content="Free, open-source real-time flight tracker built on public ADS-B data. Search any flight, watch it move, and get AI-assisted insights." />
 
-<!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-<!-- Leaflet -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
@@ -46,8 +44,8 @@
       <span id="dataStatusDot" class="data-status-dot"></span>
       <span id="dataStatusLabel" class="data-status-label">Checking…</span>
     </span>
-    <button id="navLiveMap" class="icon-btn" title="Live map — all traffic and airports">🗺 Live Map</button>
-    <button id="navAirports" class="icon-btn" title="Airport departures &amp; arrivals">✈ Airports</button>
+    <button id="navLiveMap" class="icon-btn" title="Live map — all traffic and airports">🗺 <span class="nav-label">Live Map</span></button>
+    <button id="navAirports" class="icon-btn" title="Airport departures &amp; arrivals">✈ <span class="nav-label">Airports</span></button>
     <button id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle light/dark theme">◐</button>
     <a class="icon-btn" href="https://github.com/" id="ghLink" title="View source on GitHub" aria-label="View source on GitHub">GH</a>
   </nav>
@@ -64,6 +62,11 @@
       <input id="searchInput" class="search-field" type="text" placeholder="Try BA15, UA123, or BAW15…" maxlength="10" aria-label="Flight number or callsign" />
       <button type="submit" class="search-btn">Track</button>
     </form>
+
+    <div class="quick-row" id="suggestionsRow">
+      <span class="quick-label">Try:</span>
+      <div id="suggestionChips" class="chips"></div>
+    </div>
 
     <div class="quick-row">
       <span class="quick-label">Recent:</span>
@@ -202,64 +205,30 @@
     </div>
   </section>
 
-  <div id="mapModal" class="modal" hidden>
-    <div class="modal-card map-modal-card">
-      <div class="map-modal-header">
-        <h3 id="mapModalTitle">Airport map</h3>
-        <button id="mapModalCloseBtn" class="chip-btn">✕ Close</button>
-      </div>
-      <div id="fullMap" class="full-map"></div>
+  <section class="diagnostics-view" id="diagnosticsView" hidden>
+    <div class="diagnostics-topbar">
+      <button id="diagnosticsBackBtn" class="back-btn diagnostics-back-btn">← Home</button>
+      <h1 class="diagnostics-title">Connection diagnostics</h1>
     </div>
-  </div>
 
-  <div id="keyModal" class="modal" hidden>
-    <div class="modal-card">
-      <h3>Add your AeroDataBox key</h3>
-      <p>Sign up free at <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI</a> and subscribe to AeroDataBox's free plan to get a key. Paste it below — it's saved only in this browser's local storage.</p>
-      <input id="keyInput" type="text" placeholder="Your RapidAPI key" />
-      <div class="modal-actions">
-        <button id="keySaveBtn" class="search-btn">Save</button>
-        <button id="keyClearBtn" class="chip-btn">Clear key</button>
-        <button id="keyCancelBtn" class="chip-btn">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <section class="empty-tip" id="emptyTip">
-    <div class="tip-card">
-      <h3>How search works</h3>
-      <p>Type a flight number the way you'd see it on a boarding pass (<code>BA15</code>, <code>UA123</code>) — Vectr resolves the airline's 2-letter code to the 3-letter code its transponder actually broadcasts (<code>BAW15</code>, <code>UAL123</code>) and matches it against live callsigns. You can also type the raw callsign directly. Not every flight is airborne right now — try a currently active one, or check <a href="https://www.flightradar24.com/data/flights" target="_blank" rel="noopener">a live flight board</a> for one to test with.</p>
-    </div>
-  </section>
-</main>
-
-<footer class="site-footer">
-  <p>Vectr is free &amp; open source. Flight data via <a href="https://opensky-network.org/" target="_blank" rel="noopener">The OpenSky Network</a>. Map tiles via <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a> / OpenStreetMap. Not for operational or safety-critical use.</p>
-  <button id="diagnosticsLink" class="diagnostics-link" type="button">🩺 Not seeing live data? Run a connection test</button>
-</footer>
-
-<div id="diagnosticsModal" class="modal" hidden>
-  <div class="modal-card diagnostics-modal-card">
-    <div class="map-modal-header diagnostics-modal-header">
-      <h3>Connection diagnostics</h3>
-      <button id="diagnosticsCloseBtn" class="chip-btn">✕ Close</button>
-    </div>
-    <div class="diagnostics-scroll-body">
+    <div class="diagnostics-page-body">
       <p class="diagnostics-intro">Tests each live-data path directly, bypassing caching, so you can see exactly what's reachable from this browser right now.</p>
 
-      <div class="panel-subhead">Automated tests</div>
-      <div id="diagnosticsResults" class="diagnostics-results"></div>
-      <p id="diagnosticsSummary" class="diagnostics-summary"></p>
-      <button id="diagnosticsRunBtn" class="search-btn">Run test</button>
+      <div class="diagnostics-section">
+        <div class="panel-subhead">Automated tests</div>
+        <div id="diagnosticsResults" class="diagnostics-results"></div>
+        <p id="diagnosticsSummary" class="diagnostics-summary"></p>
+        <button id="diagnosticsRunBtn" class="search-btn">Run test</button>
+      </div>
 
-      <div class="diagnostics-manual">
+      <div class="diagnostics-section">
         <div class="panel-subhead">Manual verification</div>
         <p class="diagnostics-manual-label">Open these directly in a new tab. A plain page load isn't subject to CORS at all, so if these load fine but the automated test above still fails, that confirms it's specifically a CORS restriction in fetch requests — not a general connectivity problem.</p>
         <a href="https://opensky-network.org/api/states/all?lamin=51&lamax=52&lomin=0&lomax=1" target="_blank" rel="noopener" class="chip-btn">Open OpenSky directly ↗</a>
         <a href="https://api.adsb.lol/v2/callsign/VECTR" target="_blank" rel="noopener" class="chip-btn">Open adsb.lol directly ↗</a>
       </div>
 
-      <div class="diagnostics-manual">
+      <div class="diagnostics-section">
         <div class="panel-subhead">If nothing above is working</div>
         <p class="diagnostics-manual-label">The issue is on this browser/network, and no code change to Vectr can fix it from the outside:</p>
         <ul class="diagnostics-steps">
@@ -270,15 +239,49 @@
         </ul>
       </div>
 
-      <div class="diagnostics-manual">
+      <div class="diagnostics-section">
         <div class="panel-subhead">Module check</div>
         <p class="diagnostics-manual-label">Confirms every script actually loaded, before even touching the network. Runs automatically.</p>
         <div id="moduleCheckResults" class="diagnostics-results"></div>
       </div>
     </div>
+  </section>
+
+  <section class="empty-tip" id="emptyTip">
+    <div class="tip-card">
+      <h3>How search works</h3>
+      <p>Type a flight number the way you'd see it on a boarding pass (<code>BA15</code>, <code>UA123</code>) — Vectr resolves the airline's 2-letter code to the 3-letter code its transponder actually broadcasts (<code>BAW15</code>, <code>UAL123</code>) and matches it against live callsigns. You can also type the raw callsign directly. Not every flight is airborne right now — try a currently active one, or check <a href="https://www.flightradar24.com/data/flights" target="_blank" rel="noopener">a live flight board</a> for one to test with.</p>
+    </div>
+  </section>
+</main>
+
+<div id="mapModal" class="modal" hidden>
+  <div class="modal-card map-modal-card">
+    <div class="map-modal-header">
+      <h3 id="mapModalTitle">Airport map</h3>
+      <button id="mapModalCloseBtn" class="chip-btn">✕ Close</button>
+    </div>
+    <div id="fullMap" class="full-map"></div>
   </div>
 </div>
 
+<div id="keyModal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Add your AeroDataBox key</h3>
+    <p>Sign up free at <a href="https://rapidapi.com/aedbx-aedbx/api/aerodatabox" target="_blank" rel="noopener">RapidAPI</a> and subscribe to AeroDataBox's free plan to get a key. Paste it below — it's saved only in this browser's local storage.</p>
+    <input id="keyInput" type="text" placeholder="Your RapidAPI key" />
+    <div class="modal-actions">
+      <button id="keySaveBtn" class="search-btn">Save</button>
+      <button id="keyClearBtn" class="chip-btn">Clear key</button>
+      <button id="keyCancelBtn" class="chip-btn">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <p>Vectr is free &amp; open source. Flight data via <a href="https://opensky-network.org/" target="_blank" rel="noopener">The OpenSky Network</a> and <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a>. Map tiles via <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a> / OpenStreetMap. Not for operational or safety-critical use.</p>
+  <button id="navDiagnostics" class="diagnostics-link" type="button">🩺 Not seeing live data? Run a connection test</button>
+</footer>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -291,6 +294,7 @@
 <script src="js/datastatus.js"></script>
 <script src="js/aerodatabox.js"></script>
 <script src="js/app.js"></script>
+<script src="js/suggestions.js"></script>
 <script src="js/airportview.js"></script>
 <script src="js/livemap.js"></script>
 <script src="js/permalink.js"></script>
