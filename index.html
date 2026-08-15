@@ -240,34 +240,41 @@
 
 <div id="diagnosticsModal" class="modal" hidden>
   <div class="modal-card diagnostics-modal-card">
-    <div class="map-modal-header">
+    <div class="map-modal-header diagnostics-modal-header">
       <h3>Connection diagnostics</h3>
       <button id="diagnosticsCloseBtn" class="chip-btn">✕ Close</button>
     </div>
-    <p class="diagnostics-intro">Tests each live-data path directly, bypassing caching, so you can see exactly what's reachable from this browser right now.</p>
-    <div id="diagnosticsResults" class="diagnostics-results"></div>
-    <p id="diagnosticsSummary" class="diagnostics-summary"></p>
-    <button id="diagnosticsRunBtn" class="search-btn">Run test</button>
+    <div class="diagnostics-scroll-body">
+      <p class="diagnostics-intro">Tests each live-data path directly, bypassing caching, so you can see exactly what's reachable from this browser right now.</p>
 
-    <div class="diagnostics-manual">
-      <p class="diagnostics-manual-label">One more check, done by hand: open these directly in a new tab. A plain page load isn't subject to CORS at all, so if these load fine but the automated test above still fails, that confirms it's specifically a CORS restriction in fetch requests — not a general connectivity problem.</p>
-      <a href="https://opensky-network.org/api/states/all?lamin=51&lamax=52&lomin=0&lomax=1" target="_blank" rel="noopener" class="chip-btn">Open OpenSky directly ↗</a>
-      <a href="https://api.adsb.lol/v2/callsign/VECTR" target="_blank" rel="noopener" class="chip-btn">Open adsb.lol directly ↗</a>
-    </div>
+      <div class="panel-subhead">Automated tests</div>
+      <div id="diagnosticsResults" class="diagnostics-results"></div>
+      <p id="diagnosticsSummary" class="diagnostics-summary"></p>
+      <button id="diagnosticsRunBtn" class="search-btn">Run test</button>
 
-    <div class="diagnostics-manual">
-      <p class="diagnostics-manual-label">If the control test above also fails, these are worth trying — the issue is on this browser/network, and no code change to Vectr can fix it from the outside:</p>
-      <ul class="diagnostics-steps">
-        <li>Temporarily disable ad blockers / privacy extensions (uBlock Origin, Brave Shields, etc.) and reload</li>
-        <li>Try a different network — mobile hotspot instead of office/school/home Wi-Fi</li>
-        <li>Try a different browser (e.g. Chrome vs Firefox vs Safari) to rule out a browser-specific block</li>
-        <li>Check whether a VPN, corporate proxy, or router-level DNS filter is active</li>
-      </ul>
-    </div>
+      <div class="diagnostics-manual">
+        <div class="panel-subhead">Manual verification</div>
+        <p class="diagnostics-manual-label">Open these directly in a new tab. A plain page load isn't subject to CORS at all, so if these load fine but the automated test above still fails, that confirms it's specifically a CORS restriction in fetch requests — not a general connectivity problem.</p>
+        <a href="https://opensky-network.org/api/states/all?lamin=51&lamax=52&lomin=0&lomax=1" target="_blank" rel="noopener" class="chip-btn">Open OpenSky directly ↗</a>
+        <a href="https://api.adsb.lol/v2/callsign/VECTR" target="_blank" rel="noopener" class="chip-btn">Open adsb.lol directly ↗</a>
+      </div>
 
-    <div class="diagnostics-manual">
-      <p class="diagnostics-manual-label">Module check — confirms every script actually loaded, before even touching the network. Runs automatically.</p>
-      <div id="moduleCheckResults" class="diagnostics-results"></div>
+      <div class="diagnostics-manual">
+        <div class="panel-subhead">If nothing above is working</div>
+        <p class="diagnostics-manual-label">The issue is on this browser/network, and no code change to Vectr can fix it from the outside:</p>
+        <ul class="diagnostics-steps">
+          <li>Temporarily disable ad blockers / privacy extensions (uBlock Origin, Brave Shields, etc.) and reload</li>
+          <li>Try a different network — mobile hotspot instead of office/school/home Wi-Fi</li>
+          <li>Try a different browser (e.g. Chrome vs Firefox vs Safari) to rule out a browser-specific block</li>
+          <li>Check whether a VPN, corporate proxy, or router-level DNS filter is active</li>
+        </ul>
+      </div>
+
+      <div class="diagnostics-manual">
+        <div class="panel-subhead">Module check</div>
+        <p class="diagnostics-manual-label">Confirms every script actually loaded, before even touching the network. Runs automatically.</p>
+        <div id="moduleCheckResults" class="diagnostics-results"></div>
+      </div>
     </div>
   </div>
 </div>
