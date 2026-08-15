@@ -102,27 +102,29 @@ const OpenSky = (() => {
   }
 
   /**
-   * fetch() that retries through each CORS proxy in sequence if the
-   * direct request fails with a network/CORS-shaped error. Stops at
-   * the first proxy that succeeds. HTTP error responses (the server
-   * answered, just with a 429/4xx/5xx) are NOT retried this way,
-   * since a proxy can't fix those.
+   * fetch() that, if the direct request fails with a network/CORS
+   * error, races ALL CORS proxies in parallel and returns whichever
+   * responds first — rather than trying them one at a time. Trying
+   * them sequentially meant a single slow/dead proxy tried first
+   * (observed: one specific proxy consistently timing out at 10s for
+   * some networks) delayed every request by the full timeout before
+   * ever reaching a proxy that actually works. Racing them means a
+   * fast, working proxy wins immediately regardless of what order
+   * they're listed in, and a dead one just gets ignored once it
+   * eventually times out in the background.
    */
   async function robustFetch(url) {
     try {
       return await fetchWithTimeout(url);
     } catch (directErr) {
-      console.warn(`Direct fetch failed (${directErr.message}) for ${url} \u2014 trying ${CORS_PROXIES.length} proxies in sequence`);
-      let lastErr = directErr;
-      for (const buildProxyUrl of CORS_PROXIES) {
-        try {
-          return await fetchWithTimeout(buildProxyUrl(url));
-        } catch (proxyErr) {
-          console.warn(`Proxy attempt failed (${proxyErr.message})`);
-          lastErr = proxyErr;
-        }
+      console.warn(`Direct fetch failed (${directErr.message}) for ${url} \u2014 racing ${CORS_PROXIES.length} proxies in parallel`);
+      try {
+        return await Promise.any(CORS_PROXIES.map((buildProxyUrl) => fetchWithTimeout(buildProxyUrl(url))));
+      } catch (aggregateErr) {
+        const reasons = (aggregateErr.errors || []).map((e) => e.message).join(', ');
+        console.warn(`All proxies failed: ${reasons}`);
+        throw directErr;
       }
-      throw lastErr;
     }
   }
 
