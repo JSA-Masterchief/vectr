@@ -24,10 +24,6 @@
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-snap: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* Type scale - named by role, not just size, so headings across
-     different components (modal titles, panel titles, page titles)
-     actually line up instead of drifting to whatever felt right in
-     the moment. */
   --text-2xs: .68rem;
   --text-xs: .72rem;
   --text-sm: .8rem;
@@ -38,7 +34,6 @@
   --text-2xl: 1.5rem;
   --text-display: clamp(2.1rem, 5vw, 3.4rem);
 
-  /* Spacing scale - 4px baseline */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -80,16 +75,12 @@ body{
 
 a{color:var(--accent);}
 
-/* Consistent, visible focus ring everywhere - keyboard nav should
-   feel as considered as the mouse interactions. */
 :focus-visible{
   outline:2px solid var(--accent);
   outline-offset:2px;
   border-radius:4px;
 }
 
-/* Custom scrollbars matching the dark instrument-panel aesthetic,
-   instead of the browser's default light scrollbar clashing with it */
 ::-webkit-scrollbar{width:10px; height:10px;}
 ::-webkit-scrollbar-track{background:transparent;}
 ::-webkit-scrollbar-thumb{background:var(--line); border-radius:999px; border:2px solid var(--bg-0);}
@@ -97,7 +88,22 @@ a{color:var(--accent);}
 *{scrollbar-color:var(--line) transparent; scrollbar-width:thin;}
 
 /* =========================================================
-   Ambient radar background (signature element)
+   Module error banner (Day 20 note: was Day 16's addition)
+   ========================================================= */
+.module-error-banner{
+  position:relative; z-index:1000;
+  display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap;
+  background:var(--red); color:#2A0A0B;
+  padding:10px 20px; font-family:var(--font-mono); font-size:.82rem; font-weight:600;
+  text-align:center;
+}
+.module-error-link{
+  background:rgba(0,0,0,0.15); border:none; color:inherit; border-radius:6px;
+  padding:4px 10px; font-family:var(--font-mono); font-size:.78rem; cursor:pointer;
+}
+
+/* =========================================================
+   Ambient radar background
    ========================================================= */
 .radar-bg{
   position:fixed; inset:0;
@@ -125,10 +131,22 @@ a{color:var(--accent);}
   animation:sweep 6s linear infinite;
 }
 @keyframes sweep{ to{ transform:translate(-50%,-50%) rotate(360deg); } }
+@keyframes view-fade-in{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+.hero:not([hidden]), .empty-tip:not([hidden]),
+.app-view:not([hidden]), .airport-view:not([hidden]),
+.livemap-view:not([hidden]), .diagnostics-view:not([hidden]){
+  animation:view-fade-in .28s var(--ease);
+}
 @media (prefers-reduced-motion: reduce){
   .radar-sweep{ animation:none; }
   .flap-char{ animation:none !important; }
   .chip:hover, .icon-btn:active, .search-btn:active, .chip:active{ transform:none !important; }
+  .ai-dot{ animation:none; }
+  .modal:not([hidden]), .modal-card{ animation:none; }
+  .hero:not([hidden]), .empty-tip:not([hidden]),
+  .app-view:not([hidden]), .airport-view:not([hidden]),
+  .livemap-view:not([hidden]), .diagnostics-view:not([hidden]){ animation:none; }
+  .tele-card{ animation:none !important; }
 }
 
 /* =========================================================
@@ -138,11 +156,12 @@ a{color:var(--accent);}
   position:relative; z-index:2;
   display:flex; align-items:center; justify-content:space-between;
   padding:22px 32px;
+  flex-wrap:wrap; gap:10px;
 }
 .brand{display:flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:700; letter-spacing:.06em;}
 .brand-mark{color:var(--accent);}
 .brand-name{font-size:1.05rem;}
-.topnav{display:flex; gap:8px;}
+.topnav{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
 .icon-btn{
   display:inline-flex; align-items:center; justify-content:center;
   height:36px; min-width:36px; padding:0 10px;
@@ -154,18 +173,6 @@ a{color:var(--accent);}
 }
 .icon-btn:hover{border-color:var(--accent); color:var(--accent);}
 .icon-btn:active{transform:scale(0.94);}
-
-.module-error-banner{
-  position:relative; z-index:1000;
-  display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:wrap;
-  background:var(--red); color:#2A0A0B;
-  padding:10px 20px; font-family:var(--font-mono); font-size:.82rem; font-weight:600;
-  text-align:center;
-}
-.module-error-link{
-  background:rgba(0,0,0,0.15); border:none; color:inherit; border-radius:6px;
-  padding:4px 10px; font-family:var(--font-mono); font-size:.78rem; cursor:pointer;
-}
 
 .data-status{
   display:inline-flex; align-items:center; gap:6px;
@@ -315,7 +322,14 @@ a{color:var(--accent);}
   padding:12px 14px;
   box-shadow:inset 0 1px 0 rgba(255,255,255,0.03);
   transition:border-color .2s var(--ease);
+  animation:view-fade-in .3s var(--ease) backwards;
 }
+.tele-card:nth-child(1){animation-delay:.02s;}
+.tele-card:nth-child(2){animation-delay:.06s;}
+.tele-card:nth-child(3){animation-delay:.10s;}
+.tele-card:nth-child(4){animation-delay:.14s;}
+.tele-card:nth-child(5){animation-delay:.18s;}
+.tele-card:nth-child(6){animation-delay:.22s;}
 .tele-card:hover{border-color:color-mix(in srgb, var(--accent) 30%, var(--line));}
 .tele-label{display:block; font-size:.7rem; color:var(--text-2); text-transform:uppercase; letter-spacing:.05em; margin-bottom:6px;}
 .tele-value{font-family:var(--font-mono); font-weight:600; font-size:1.05rem; color:var(--text-0); transition:color .2s var(--ease);}
@@ -331,7 +345,6 @@ a{color:var(--accent);}
 }
 .ai-dot{width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent); animation:pulse-dot 2.4s ease-in-out infinite;}
 @keyframes pulse-dot{ 0%,100%{opacity:1;} 50%{opacity:.5;} }
-@media (prefers-reduced-motion: reduce){ .ai-dot{ animation:none; } }
 .ai-tag{margin-left:auto; font-family:var(--font-mono); font-size:.65rem; color:var(--text-2); border:1px solid var(--line); padding:2px 8px; border-radius:999px;}
 .ai-list{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px;}
 .ai-list li{font-size:.86rem; color:var(--text-1); line-height:1.5; padding-left:14px; position:relative;}
@@ -357,38 +370,30 @@ a{color:var(--accent);}
 }
 .diagnostics-link:hover{color:var(--accent);}
 
-.diagnostics-modal-card{
-  max-width:580px; width:100%;
-  max-height:min(85vh, 720px);
-  display:flex; flex-direction:column;
-  padding:0; overflow:hidden;
-}
-.diagnostics-modal-header{
-  margin:0; padding:22px 24px 16px; flex-shrink:0;
-  border-bottom:1px solid var(--line-soft);
-}
-.diagnostics-scroll-body{
-  overflow-y:auto; padding:18px 24px 24px;
-}
-.diagnostics-intro{color:var(--text-1); font-size:.85rem; line-height:1.5; margin:0 0 16px;}
-.diagnostics-results{display:flex; flex-direction:column; gap:8px; margin-bottom:16px;}
-.diag-row{
-  display:flex; align-items:center; gap:10px;
-  background:var(--bg-2); border:1px solid var(--line); border-radius:8px;
-  padding:10px 12px; font-size:.85rem;
-}
-.diag-icon{font-size:.9rem; width:20px; text-align:center;}
-.diag-label{flex:1; font-family:var(--font-body);}
-.diag-detail{font-family:var(--font-mono); font-size:.75rem; color:var(--text-2); white-space:nowrap;}
-.diagnostics-summary{font-size:.85rem; line-height:1.6; color:var(--text-1); background:var(--bg-2); border:1px solid var(--line); border-radius:8px; padding:12px 14px; margin:0 0 16px;}
-.diagnostics-manual{border-top:1px solid var(--line-soft); margin-top:18px; padding-top:16px;}
-.diagnostics-manual-label{font-size:.8rem; color:var(--text-2); line-height:1.5; margin:0 0 12px;}
-.diagnostics-manual a{margin-right:8px; text-decoration:none;}
-.diagnostics-steps{margin:0; padding-left:18px; color:var(--text-1); font-size:.82rem; line-height:1.7;}
-
 /* Leaflet marker */
 .plane-icon{ color:var(--accent); filter: drop-shadow(0 0 6px rgba(45,217,196,.6)); }
 .plane-marker-wrap{ transition: transform 1s linear; }
+
+/* =========================================================
+   Modal (key entry, map expand)
+   ========================================================= */
+.modal{position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.55); padding:20px; display:none;}
+.modal:not([hidden]){display:flex; align-items:center; justify-content:center; animation:modal-backdrop .2s var(--ease);}
+.modal-card{
+  background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius);
+  padding:24px; max-width:420px; width:100%; box-shadow:var(--shadow-lift);
+  animation:modal-card-in .25s var(--ease-snap);
+}
+@keyframes modal-backdrop{ from{opacity:0;} to{opacity:1;} }
+@keyframes modal-card-in{ from{opacity:0; transform:translateY(8px) scale(0.98);} to{opacity:1; transform:translateY(0) scale(1);} }
+.modal-card h3{margin:0 0 10px; font-family:var(--font-display); font-size:var(--text-lg);}
+.modal-card p{color:var(--text-1); font-size:.85rem; line-height:1.6; margin:0 0 14px;}
+.modal-card input{
+  width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line);
+  background:var(--bg-2); color:var(--text-0); font-family:var(--font-mono); font-size:.9rem;
+  margin-bottom:14px;
+}
+.modal-actions{display:flex; gap:8px; flex-wrap:wrap;}
 
 /* =========================================================
    Airport Explorer
@@ -450,28 +455,6 @@ a{color:var(--accent);}
 .schedule-table th{text-align:left; color:var(--text-2); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; padding:6px 10px; border-bottom:1px solid var(--line);}
 .schedule-table td{padding:8px 10px; border-bottom:1px solid var(--line-soft); font-family:var(--font-mono); color:var(--text-0);}
 
-/* Modal */
-.modal{position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.55); padding:20px; display:none;}
-.modal:not([hidden]){display:flex; align-items:center; justify-content:center; animation:modal-backdrop .2s var(--ease);}
-.modal-card{
-  background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius);
-  padding:24px; max-width:420px; width:100%; box-shadow:var(--shadow-lift);
-  animation:modal-card-in .25s var(--ease-snap);
-}
-@keyframes modal-backdrop{ from{opacity:0;} to{opacity:1;} }
-@keyframes modal-card-in{ from{opacity:0; transform:translateY(8px) scale(0.98);} to{opacity:1; transform:translateY(0) scale(1);} }
-@media (prefers-reduced-motion: reduce){
-  .modal:not([hidden]), .modal-card{ animation:none; }
-}
-.modal-card h3{margin:0 0 10px; font-family:var(--font-display); font-size:var(--text-lg);}
-.modal-card p{color:var(--text-1); font-size:.85rem; line-height:1.6; margin:0 0 14px;}
-.modal-card input{
-  width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line);
-  background:var(--bg-2); color:var(--text-0); font-family:var(--font-mono); font-size:.9rem;
-  margin-bottom:14px;
-}
-.modal-actions{display:flex; gap:8px; flex-wrap:wrap;}
-
 /* =========================================================
    Live Map
    ========================================================= */
@@ -504,13 +487,45 @@ a{color:var(--accent);}
 .livemap-panel-action{width:100%; margin-top:16px;}
 .livemap-plane{color:var(--accent); font-size:18px; line-height:1; filter: drop-shadow(0 0 4px rgba(45,217,196,.6));}
 
-/* Marker cluster bubbles, restyled to match the design system
-   instead of the plugin's default yellow/orange look */
 .vectr-cluster{
   background:var(--accent-dim); border:2px solid var(--accent);
   border-radius:50%; display:flex; align-items:center; justify-content:center;
   color:var(--accent); font-family:var(--font-mono); font-weight:700; font-size:.8rem;
 }
+
+/* =========================================================
+   Diagnostics — full page (Day 20; was a modal before)
+   ========================================================= */
+.diagnostics-view{
+  position:relative; z-index:2;
+  display:none;
+}
+.diagnostics-view:not([hidden]){display:block;}
+.diagnostics-topbar{
+  display:flex; align-items:center; gap:16px; padding:20px 24px;
+  border-bottom:1px solid var(--line-soft); max-width:760px; margin:0 auto;
+  flex-wrap:wrap;
+}
+.diagnostics-back-btn{position:static; flex-shrink:0;}
+.diagnostics-title{font-family:var(--font-display); font-size:var(--text-2xl); margin:0;}
+.diagnostics-page-body{max-width:760px; margin:0 auto; padding:28px 24px 60px;}
+.diagnostics-intro{color:var(--text-1); font-size:.9rem; line-height:1.6; margin:0 0 28px;}
+
+.diagnostics-section{margin-bottom:32px; padding-bottom:28px; border-bottom:1px solid var(--line-soft);}
+.diagnostics-section:last-child{border-bottom:none; margin-bottom:0; padding-bottom:0;}
+
+.diagnostics-results{display:flex; flex-direction:column; gap:8px; margin-bottom:16px;}
+.diag-row{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  background:var(--bg-1); border:1px solid var(--line); border-radius:8px;
+  padding:12px 14px; font-size:.85rem;
+}
+.diag-icon{font-size:.9rem; width:20px; text-align:center; flex-shrink:0;}
+.diag-label{flex:1; min-width:140px; font-family:var(--font-body);}
+.diag-detail{font-family:var(--font-mono); font-size:.75rem; color:var(--text-2);}
+.diagnostics-summary{font-size:.9rem; line-height:1.6; color:var(--text-1); background:var(--bg-2); border:1px solid var(--line); border-radius:var(--radius); padding:16px 18px; margin:0 0 18px;}
+.diagnostics-manual-label{font-size:.85rem; color:var(--text-1); line-height:1.6; margin:0 0 14px;}
+.diagnostics-steps{margin:0; padding-left:20px; color:var(--text-1); font-size:.86rem; line-height:1.8;}
 
 /* =========================================================
    Responsive
@@ -519,6 +534,11 @@ a{color:var(--accent);}
   .app-view{grid-template-columns:1fr; height:auto;}
   .map-wrap{height:52vh;}
   .info-panel{border-left:none; border-top:1px solid var(--line-soft); max-height:none;}
+}
+@media (max-width: 700px){
+  .icon-btn .nav-label{display:none;}
+  .data-status-label{display:none;}
+  .data-status{padding:0 8px;}
 }
 @media (max-width: 560px){
   .topbar{padding:16px 18px;}
@@ -531,7 +551,8 @@ a{color:var(--accent);}
   .livemap-panel{left:16px; right:16px; width:auto;}
   .livemap-topbar{padding:12px;}
   .diag-row{flex-wrap:wrap;}
-  .diag-detail{white-space:normal;}
-  .diagnostics-modal-header{padding:18px 18px 14px;}
-  .diagnostics-scroll-body{padding:16px 18px 20px;}
+  .diagnostics-page-body{padding:20px 18px 40px;}
+  .diagnostics-topbar{padding:16px 18px;}
 }
+.schedule-block{overflow-x:auto;}
+.schedule-table{min-width:480px;}
