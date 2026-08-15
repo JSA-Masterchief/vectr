@@ -129,7 +129,7 @@
     const zoom = map.getZoom();
     if (zoom < MIN_ZOOM_FOR_TRAFFIC) {
       clearPlaneMarkers();
-      statusEl.textContent = `Zoom in to load live traffic (currently zoomed out too far — zoom ${zoom}/${MIN_ZOOM_FOR_TRAFFIC}).`;
+      statusEl.textContent = 'Zoom in further to load live traffic in this area.';
       return;
     }
     const now = Date.now();
