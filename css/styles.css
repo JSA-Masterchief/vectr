@@ -147,6 +147,7 @@ a{color:var(--accent);}
   .app-view:not([hidden]), .airport-view:not([hidden]),
   .livemap-view:not([hidden]), .diagnostics-view:not([hidden]){ animation:none; }
   .tele-card{ animation:none !important; }
+  .status-pill::before{ animation:none; }
 }
 
 /* =========================================================
@@ -292,12 +293,18 @@ a{color:var(--accent);}
 .flight-sub{color:var(--text-1); font-size:.88rem; margin-top:8px;}
 .aircraft-meta{color:var(--text-2); font-size:.8rem; margin-top:4px; font-family:var(--font-mono);}
 .status-pill{
-  display:inline-block; margin-top:10px; font-family:var(--font-mono); font-size:.72rem;
+  display:inline-flex; align-items:center; gap:6px;
+  margin-top:10px; font-family:var(--font-mono); font-size:.72rem;
   padding:4px 10px; border-radius:999px; background:var(--accent-dim); color:var(--accent);
   letter-spacing:.05em;
 }
+.status-pill::before{
+  content:''; width:6px; height:6px; border-radius:50%; background:currentColor;
+  animation:pulse-dot 2.4s ease-in-out infinite;
+}
 .status-pill.warn{background:rgba(245,166,35,0.18); color:var(--amber);}
 .status-pill.bad{background:rgba(242,85,90,0.18); color:var(--red);}
+.status-pill.bad::before{animation:none;}
 
 .route-strip{
   display:flex; align-items:center; justify-content:space-between;
