@@ -92,13 +92,19 @@
   runModuleCheck();
 
   // ---------- Network tests ----------
+  // Four proxies, using three DIFFERENT mechanisms (query-param
+  // encoding vs raw URL prepending) so a quirk specific to one
+  // encoding style doesn't take out every fallback at once.
   const CORS_PROXIES = [
     { name: 'codetabs', build: (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}` },
     { name: 'corsproxy.io', build: (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}` },
     { name: 'allorigins', build: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
+    { name: 'thingproxy', build: (url) => `https://thingproxy.freeboard.io/fetch/${url}` },
   ];
   const TIMEOUT_MS = 10000;
   const CONTROL_URL = 'https://api.github.com';
+  const REAL_OPENSKY_URL = 'https://opensky-network.org/api/states/all?lamin=51&lamax=52&lomin=0&lomax=1';
+  const REAL_ADSBLOL_URL = 'https://api.adsb.lol/v2/callsign/VECTR';
 
   async function timedFetch(url) {
     const controller = new AbortController();
@@ -119,11 +125,19 @@
     }
   }
 
+  // IMPORTANT FIX vs the previous version: proxies used to only be
+  // tested against a trivial, parameter-free control URL
+  // (api.github.com). A proxy can handle a simple URL fine and
+  // still fail on a real one with several query parameters (like
+  // OpenSky's bbox query) — which is exactly the kind of gap that
+  // made "diagnostics says it should work" not match reality. Every
+  // proxy is now tested against the REAL target URLs.
   const TESTS = [
     { label: 'Control \u2014 api.github.com (known-good)', url: CONTROL_URL },
-    { label: 'OpenSky \u2014 direct', url: 'https://opensky-network.org/api/states/all?lamin=51&lamax=52&lomin=0&lomax=1' },
-    { label: 'adsb.lol \u2014 direct', url: 'https://api.adsb.lol/v2/callsign/VECTR' },
-    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name}`, url: p.build(CONTROL_URL) })),
+    { label: 'OpenSky \u2014 direct', url: REAL_OPENSKY_URL },
+    { label: 'adsb.lol \u2014 direct', url: REAL_ADSBLOL_URL },
+    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (OpenSky query)`, url: p.build(REAL_OPENSKY_URL) })),
+    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (adsb.lol query)`, url: p.build(REAL_ADSBLOL_URL) })),
   ];
 
   async function runTests() {
@@ -159,18 +173,19 @@
     const control = results[0];
     const openSky = results[1];
     const adsbLol = results[2];
-    const proxies = results.slice(3);
-    const anyProxyOk = proxies.some((p) => p.ok);
+    const proxyTests = results.slice(3); // 4 proxies x 2 real URLs = 8 entries
+    const workingProxyTests = proxyTests.filter((p) => p.ok);
+    const anyProxyOk = workingProxyTests.length > 0;
 
     if (!control.ok) {
       summaryEl.textContent =
         '\u26a0\ufe0f Even the control test (a well-known, always-up API) failed. This points to something blocking cross-origin requests on this specific browser or network \u2014 a privacy extension, corporate/school firewall, or DNS filtering \u2014 rather than a Vectr or provider problem. Try a different network, a different browser, or temporarily disabling extensions to confirm.';
     } else if (!openSky.ok && !adsbLol.ok && !anyProxyOk) {
       summaryEl.textContent =
-        '\u26a0\ufe0f The control test passed, but OpenSky, adsb.lol, AND every proxy failed. These specific services may be down or blocked on this network right now \u2014 worth trying again later or from a different network.';
+        '\u26a0\ufe0f The control test passed, but OpenSky, adsb.lol, AND every proxy \u2014 tested against the real query URLs, not just a simple test URL \u2014 failed. These specific services may be down or blocked on this network right now.';
     } else if (!openSky.ok && !adsbLol.ok && anyProxyOk) {
-      summaryEl.textContent =
-        '\u2705 At least one proxy works, which Vectr will use automatically (racing all of them in parallel, so a slow/dead one never holds up a working one). OpenSky and adsb.lol direct connections are currently blocked here, but live data should load via the working proxy.';
+      const workingNames = [...new Set(workingProxyTests.map((p) => p.label.match(/Proxy \u2014 (\S+)/)?.[1]).filter(Boolean))];
+      summaryEl.textContent = `\u2705 Confirmed working against the real query URLs (not just a simple test): ${workingNames.join(', ')}. Vectr will use ${workingNames.length > 1 ? 'these' : 'this'} automatically \u2014 live data should load.`;
     } else {
       summaryEl.textContent = '\u2705 At least one live-data path is working directly \u2014 Vectr should be showing live data.';
     }
