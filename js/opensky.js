@@ -44,6 +44,7 @@ const OpenSky = (() => {
     (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
     (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
   ];
   const REQUEST_TIMEOUT_MS = 10000;
 
@@ -95,9 +96,9 @@ const OpenSky = (() => {
    * (common with flaky free APIs/proxies) would leave the UI stuck
    * on "Searching…" forever with no error ever surfacing.
    */
-  async function fetchWithTimeout(url) {
+  async function fetchWithTimeout(url, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(url, { signal: controller.signal });
     } catch (err) {
@@ -108,18 +109,25 @@ const OpenSky = (() => {
     }
   }
 
+  const DIRECT_ATTEMPT_TIMEOUT_MS = 4000; // fail fast - proxies are ready to race immediately, no reason to wait the full 10s for a direct connection that's likely CORS-blocked anyway
+
   /**
    * fetch() that, if the direct request fails with a network/CORS
    * error, races ALL CORS proxies in parallel and returns whichever
-   * responds first, rather than trying them one at a time.
+   * responds first, rather than trying them one at a time. The
+   * initial direct attempt uses a short timeout (4s) since a CORS
+   * block or dead connection rarely needs the full 10s to reveal
+   * itself, and every second spent waiting on it is a second not
+   * spent on the (already-ready) proxy race.
    */
   async function robustFetch(url) {
     try {
-      return await fetchWithTimeout(url);
+      return await fetchWithTimeout(url, DIRECT_ATTEMPT_TIMEOUT_MS);
     } catch (directErr) {
       console.warn(`Direct fetch failed (${directErr.message}) for ${url} \u2014 racing ${CORS_PROXIES.length} proxies in parallel`);
       try {
-        return await Promise.any(CORS_PROXIES.map((buildProxyUrl) => fetchWithTimeout(buildProxyUrl(url))));
+        const winner = await Promise.any(CORS_PROXIES.map((buildProxyUrl) => fetchWithTimeout(buildProxyUrl(url))));
+        return winner;
       } catch (aggregateErr) {
         const reasons = (aggregateErr.errors || []).map((e) => e.message).join(', ');
         console.warn(`All proxies failed: ${reasons}`);
