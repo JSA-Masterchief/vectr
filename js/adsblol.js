@@ -24,12 +24,13 @@ const AdsbLol = (() => {
     (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
     (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
   ];
   const REQUEST_TIMEOUT_MS = 10000;
 
-  async function fetchWithTimeout(url) {
+  async function fetchWithTimeout(url, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await fetch(url, { signal: controller.signal });
     } catch (err) {
@@ -40,9 +41,11 @@ const AdsbLol = (() => {
     }
   }
 
+  const DIRECT_ATTEMPT_TIMEOUT_MS = 4000;
+
   async function robustFetch(url) {
     try {
-      return await fetchWithTimeout(url);
+      return await fetchWithTimeout(url, DIRECT_ATTEMPT_TIMEOUT_MS);
     } catch (directErr) {
       console.warn(`adsb.lol direct fetch failed (${directErr.message}) \u2014 racing ${CORS_PROXIES.length} proxies in parallel`);
       try {
