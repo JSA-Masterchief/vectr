@@ -160,7 +160,7 @@ a{color:var(--accent);}
   flex-wrap:wrap; gap:10px;
 }
 .brand{display:flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:700; letter-spacing:.06em;}
-.brand-mark{color:var(--accent);}
+.brand-mark{color:var(--accent); text-shadow:0 0 12px color-mix(in srgb, var(--accent) 50%, transparent);}
 .brand-name{font-size:1.05rem;}
 .topnav{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
 .icon-btn{
@@ -195,7 +195,12 @@ a{color:var(--accent);}
 }
 .eyebrow{
   font-family:var(--font-mono); font-size:.78rem; letter-spacing:.08em;
-  color:var(--accent); text-transform:uppercase; margin:0 0 18px;
+  color:var(--accent); text-transform:uppercase; margin:0 0 var(--space-5);
+  display:inline-flex; align-items:center; gap:var(--space-2);
+}
+.eyebrow::before{
+  content:''; width:16px; height:1px; background:var(--accent);
+  box-shadow:0 0 6px var(--accent);
 }
 .hero h1{
   font-family:var(--font-display); font-weight:700;
@@ -223,12 +228,20 @@ a{color:var(--accent);}
 .search-field::placeholder{color:var(--text-2); text-transform:none; letter-spacing:0;}
 .search-field:focus-visible{outline:none;}
 .search-btn{
+  position:relative; overflow:hidden;
   background:var(--accent); color:#04211D; border:none; border-radius:10px;
   padding:12px 22px; font-family:var(--font-display); font-weight:600; font-size:.92rem;
   cursor:pointer; transition:filter .15s var(--ease), transform .12s var(--ease-snap);
 }
+.search-btn::before{
+  content:''; position:absolute; top:0; left:-60%; width:40%; height:100%;
+  background:linear-gradient(115deg, transparent, rgba(255,255,255,0.35), transparent);
+  transform:skewX(-20deg); transition:left .55s var(--ease);
+}
+.search-btn:hover::before{left:130%;}
 .search-btn:hover{filter:brightness(1.08);}
 .search-btn:active{transform:scale(0.97);}
+@media (prefers-reduced-motion: reduce){ .search-btn::before{transition:none; display:none;} }
 
 .quick-row{margin-top:20px; display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap;}
 .quick-label{color:var(--text-2); font-size:.82rem;}
@@ -255,10 +268,25 @@ a{color:var(--accent);}
 }
 .app-view:not([hidden]){display:grid; grid-template-columns: 1fr 380px;}
 .map-wrap{position:relative;}
+.map-wrap::after{
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:400;
+  box-shadow:inset 0 0 120px rgba(0,0,0,0.35);
+}
 #map{position:absolute; inset:0; background:var(--bg-2);}
 .map-controls{
   position:absolute; top:16px; left:16px; z-index:500;
   display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+}
+/* "Glass cockpit" treatment — floating controls that sit directly
+   over live map imagery get a genuine frosted-glass look (blurring
+   what's beneath them), same idea as a real glass avionics display
+   overlaying a moving map. Only applied where a map is actually
+   visible underneath; ordinary buttons elsewhere stay solid. */
+.map-controls .chip-btn, .map-controls .last-updated, #backBtn, .expand-map-btn{
+  background:color-mix(in srgb, var(--bg-1) 68%, transparent);
+  backdrop-filter:blur(14px) saturate(160%);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  border-color:color-mix(in srgb, var(--line) 70%, transparent);
 }
 .chip-btn{
   font-family:var(--font-mono); font-size:.78rem;
@@ -381,6 +409,15 @@ a{color:var(--accent);}
 .plane-icon{ color:var(--accent); filter: drop-shadow(0 0 6px rgba(45,217,196,.6)); }
 .plane-marker-wrap{ transition: transform 1s linear; }
 
+/* Radar-screen map tint (dark mode only) — real ATC radar displays
+   are famously monochrome phosphor screens; a faint push toward
+   that same teal an the rest of the interface keeps every map
+   visually part of the same instrument, not a generic embedded
+   Google-Maps-style widget. Kept subtle on purpose. */
+[data-theme="dark"] .leaflet-tile-pane{
+  filter: saturate(65%) brightness(0.9) hue-rotate(-6deg);
+}
+
 /* =========================================================
    Modal (key entry, map expand)
    ========================================================= */
@@ -420,13 +457,17 @@ a{color:var(--accent);}
 .airport-meta{color:var(--text-1); font-size:.85rem; margin:0; font-family:var(--font-mono);}
 
 .mini-map-row{position:relative; margin-bottom:20px;}
-.airport-mini-map{height:340px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
+.airport-mini-map{height:340px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--line); position:relative;}
+.airport-mini-map::after, .full-map::after{
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:400;
+  box-shadow:inset 0 0 80px rgba(0,0,0,0.35); border-radius:var(--radius);
+}
 .expand-map-btn{position:absolute; top:12px; right:12px; z-index:500; background:var(--bg-1);}
 
 .map-modal-card{max-width:min(1100px, 92vw); width:100%; padding:16px;}
 .map-modal-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;}
 .map-modal-header h3{margin:0; font-family:var(--font-display); font-size:var(--text-lg);}
-.full-map{height:min(75vh, 700px); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line);}
+.full-map{height:min(75vh, 700px); border-radius:var(--radius); overflow:hidden; border:1px solid var(--line); position:relative;}
 
 .board-tabs{display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap;}
 .board-tab{
@@ -447,7 +488,10 @@ a{color:var(--accent);}
   padding:12px 14px; cursor:pointer; font-family:var(--font-body);
   transition:border-color .18s var(--ease), transform .18s var(--ease), box-shadow .18s var(--ease);
 }
-.board-row:hover{border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 20px -12px rgba(0,0,0,0.5);}
+.board-row:hover{
+  border-color:var(--accent); transform:translateY(-2px);
+  box-shadow:0 2px 6px -2px rgba(0,0,0,0.4), 0 12px 24px -14px rgba(0,0,0,0.5), 0 0 0 1px color-mix(in srgb, var(--accent) 15%, transparent);
+}
 .board-row:active{transform:translateY(0); box-shadow:none;}
 .board-callsign{font-family:var(--font-mono); font-weight:700; color:var(--accent);}
 .board-detail{font-size:.82rem; color:var(--text-1);}
@@ -480,12 +524,19 @@ a{color:var(--accent);}
 .livemap-status{font-family:var(--font-mono); font-size:.8rem; color:var(--text-1); margin:0;}
 
 .livemap-wrap{position:relative; flex:1;}
+.livemap-wrap::after{
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:400;
+  box-shadow:inset 0 0 140px rgba(0,0,0,0.35);
+}
 #liveMap{position:absolute; inset:0; background:var(--bg-2);}
 
 .livemap-panel{
   position:absolute; top:16px; right:16px; bottom:16px; z-index:600;
   width:320px; max-width:calc(100vw - 32px);
-  background:var(--bg-1); border:1px solid var(--line); border-radius:var(--radius);
+  background:color-mix(in srgb, var(--bg-1) 82%, transparent);
+  backdrop-filter:blur(16px) saturate(160%);
+  -webkit-backdrop-filter:blur(16px) saturate(160%);
+  border:1px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius:var(--radius);
   padding:20px; box-shadow:var(--shadow-lift); overflow-y:auto;
   display:none;
 }
