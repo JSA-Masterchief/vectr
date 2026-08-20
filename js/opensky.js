@@ -40,11 +40,16 @@ const OpenSky = (() => {
   // browser-level network/CORS error. Racing (not trying one at a
   // time) means a single slow/dead proxy never delays a request
   // past however long the fastest working one takes.
+  // Ordered by demonstrated reliability across multiple real test
+  // runs: corsproxy.io has been the most consistently reachable;
+  // codetabs has timed out on every single test run so far, so it's
+  // tried last (when it fails, it wastes the most time of any of
+  // these, so it shouldn't be first in a sequential chain).
   const CORS_PROXIES = [
-    (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
     (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
   ];
   const REQUEST_TIMEOUT_MS = 10000;
 
@@ -109,30 +114,38 @@ const OpenSky = (() => {
     }
   }
 
-  const DIRECT_ATTEMPT_TIMEOUT_MS = 4000; // fail fast - proxies are ready to race immediately, no reason to wait the full 10s for a direct connection that's likely CORS-blocked anyway
+  const DIRECT_ATTEMPT_TIMEOUT_MS = 4000; // fail fast - a CORS block rarely needs 10s to reveal itself
+  const PROXY_ATTEMPT_TIMEOUT_MS = 5000; // per-proxy budget when trying sequentially
 
   /**
-   * fetch() that, if the direct request fails with a network/CORS
-   * error, races ALL CORS proxies in parallel and returns whichever
-   * responds first, rather than trying them one at a time. The
-   * initial direct attempt uses a short timeout (4s) since a CORS
-   * block or dead connection rarely needs the full 10s to reveal
-   * itself, and every second spent waiting on it is a second not
-   * spent on the (already-ready) proxy race.
+   * fetch() that, if the direct request fails, tries each CORS
+   * proxy in sequence (not all at once) until one succeeds.
+   *
+   * DAY 26 FIX — this used to race all proxies in parallel via
+   * Promise.any(), which seemed strictly faster. In practice, firing
+   * 4 simultaneous requests at 4 different free proxy services (and
+   * doing that on every single app request) looks like a burst/abuse
+   * pattern to those services — confirmed directly: a diagnostics run
+   * that fired proxy requests in parallel got back an HTTP 429 (rate
+   * limited) from a proxy that works fine when hit once, in
+   * isolation. Trying them one at a time, each with its own short
+   * timeout, never puts concurrent load on any single proxy.
    */
   async function robustFetch(url) {
     try {
       return await fetchWithTimeout(url, DIRECT_ATTEMPT_TIMEOUT_MS);
     } catch (directErr) {
-      console.warn(`Direct fetch failed (${directErr.message}) for ${url} \u2014 racing ${CORS_PROXIES.length} proxies in parallel`);
-      try {
-        const winner = await Promise.any(CORS_PROXIES.map((buildProxyUrl) => fetchWithTimeout(buildProxyUrl(url))));
-        return winner;
-      } catch (aggregateErr) {
-        const reasons = (aggregateErr.errors || []).map((e) => e.message).join(', ');
-        console.warn(`All proxies failed: ${reasons}`);
-        throw directErr;
+      console.warn(`Direct fetch failed (${directErr.message}) for ${url} \u2014 trying ${CORS_PROXIES.length} proxies one at a time`);
+      let lastErr = directErr;
+      for (const buildProxyUrl of CORS_PROXIES) {
+        try {
+          return await fetchWithTimeout(buildProxyUrl(url), PROXY_ATTEMPT_TIMEOUT_MS);
+        } catch (proxyErr) {
+          console.warn(`Proxy attempt failed (${proxyErr.message})`);
+          lastErr = proxyErr;
+        }
       }
+      throw lastErr;
     }
   }
 
