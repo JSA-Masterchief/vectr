@@ -21,10 +21,10 @@
 const AdsbLol = (() => {
   const BASE = 'https://api.adsb.lol/v2';
   const CORS_PROXIES = [
-    (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
     (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
-    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+    (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
   ];
   const REQUEST_TIMEOUT_MS = 10000;
 
@@ -42,19 +42,24 @@ const AdsbLol = (() => {
   }
 
   const DIRECT_ATTEMPT_TIMEOUT_MS = 4000;
+  const PROXY_ATTEMPT_TIMEOUT_MS = 5000;
 
+  /** DAY 26: sequential, not parallel - see opensky.js for the full explanation. */
   async function robustFetch(url) {
     try {
       return await fetchWithTimeout(url, DIRECT_ATTEMPT_TIMEOUT_MS);
     } catch (directErr) {
-      console.warn(`adsb.lol direct fetch failed (${directErr.message}) \u2014 racing ${CORS_PROXIES.length} proxies in parallel`);
-      try {
-        return await Promise.any(CORS_PROXIES.map((buildProxyUrl) => fetchWithTimeout(buildProxyUrl(url))));
-      } catch (aggregateErr) {
-        const reasons = (aggregateErr.errors || []).map((e) => e.message).join(', ');
-        console.warn(`All proxies failed: ${reasons}`);
-        throw directErr;
+      console.warn(`adsb.lol direct fetch failed (${directErr.message}) \u2014 trying ${CORS_PROXIES.length} proxies one at a time`);
+      let lastErr = directErr;
+      for (const buildProxyUrl of CORS_PROXIES) {
+        try {
+          return await fetchWithTimeout(buildProxyUrl(url), PROXY_ATTEMPT_TIMEOUT_MS);
+        } catch (proxyErr) {
+          console.warn(`Proxy attempt failed (${proxyErr.message})`);
+          lastErr = proxyErr;
+        }
       }
+      throw lastErr;
     }
   }
 
