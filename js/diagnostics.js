@@ -96,10 +96,10 @@
   // encoding vs raw URL prepending) so a quirk specific to one
   // encoding style doesn't take out every fallback at once.
   const CORS_PROXIES = [
-    { name: 'codetabs', build: (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}` },
     { name: 'corsproxy.io', build: (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}` },
-    { name: 'allorigins', build: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
     { name: 'thingproxy', build: (url) => `https://thingproxy.freeboard.io/fetch/${url}` },
+    { name: 'allorigins', build: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
+    { name: 'codetabs', build: (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}` },
   ];
   const TIMEOUT_MS = 10000;
   const CONTROL_URL = 'https://api.github.com';
@@ -144,25 +144,30 @@
     resultsEl.innerHTML = '';
     summaryEl.textContent = '';
     runBtn.disabled = true;
-    runBtn.textContent = 'Running\u2026';
 
     const rows = TESTS.map((t) => {
-      const row = diagRow(t.label, true, 'Testing\u2026');
+      const row = diagRow(t.label, true, 'Waiting\u2026');
       row.querySelector('.diag-icon').textContent = '\u23f3';
       row.querySelector('.diag-icon').className = 'diag-icon';
       resultsEl.appendChild(row);
       return row;
     });
 
-    const results = await Promise.all(
-      TESTS.map(async (t, i) => {
-        const result = await timedFetch(t.url);
-        rows[i].querySelector('.diag-icon').textContent = result.ok ? '\u2705' : '\u274c';
-        rows[i].querySelector('.diag-icon').className = `diag-icon ${result.ok ? 'good' : 'bad'}`;
-        rows[i].querySelector('.diag-detail').textContent = `${result.detail} \u00b7 ${result.ms}ms`;
-        return { label: t.label, ...result };
-      })
-    );
+    // Sequential, not Promise.all: firing every test simultaneously
+    // sends multiple concurrent requests to the SAME proxy domains
+    // (each proxy is tested twice, once per real URL) — exactly the
+    // burst pattern that triggered an HTTP 429 from a proxy that
+    // works fine when hit once. One at a time gives a true picture.
+    const results = [];
+    for (let i = 0; i < TESTS.length; i++) {
+      runBtn.textContent = `Running\u2026 (${i + 1}/${TESTS.length})`;
+      rows[i].querySelector('.diag-detail').textContent = 'Testing\u2026';
+      const result = await timedFetch(TESTS[i].url);
+      rows[i].querySelector('.diag-icon').textContent = result.ok ? '\u2705' : '\u274c';
+      rows[i].querySelector('.diag-icon').className = `diag-icon ${result.ok ? 'good' : 'bad'}`;
+      rows[i].querySelector('.diag-detail').textContent = `${result.detail} \u00b7 ${result.ms}ms`;
+      results.push({ label: TESTS[i].label, ...result });
+    }
 
     renderSummary(results);
     runBtn.disabled = false;
