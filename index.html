@@ -212,7 +212,7 @@
     </div>
 
     <div class="diagnostics-page-body">
-      <p class="diagnostics-intro">Tests each live-data path directly, bypassing caching, so you can see exactly what's reachable from this browser right now.</p>
+      <p class="diagnostics-intro">Tests each live-data path directly, bypassing caching, one at a time (not all at once — firing everything simultaneously can itself trigger rate limits on some proxies, which would give a false picture). This can take up to a minute to fully complete.</p>
 
       <div class="diagnostics-section">
         <div class="panel-subhead">Automated tests</div>
