@@ -26,13 +26,17 @@ const AdsbLol = (() => {
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
   ];
+  function withBust(url) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}_=${Date.now()}`;
+  }
   const REQUEST_TIMEOUT_MS = 10000;
 
   async function fetchWithTimeout(url, timeoutMs = REQUEST_TIMEOUT_MS) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await fetch(url, { signal: controller.signal });
+      return await fetch(url, { signal: controller.signal, cache: 'no-store' });
     } catch (err) {
       if (err.name === 'AbortError') throw new Error('TIMEOUT');
       throw err;
@@ -49,11 +53,19 @@ const AdsbLol = (() => {
     try {
       return await fetchWithTimeout(url, DIRECT_ATTEMPT_TIMEOUT_MS);
     } catch (directErr) {
+      if (typeof CustomProxy !== 'undefined' && CustomProxy.has()) {
+        try {
+          console.warn('Trying your configured private proxy first...');
+          return await fetchWithTimeout(withBust(CustomProxy.build(url)), PROXY_ATTEMPT_TIMEOUT_MS);
+        } catch (customErr) {
+          console.warn(`Private proxy failed (${customErr.message}) \u2014 falling back to public proxies`);
+        }
+      }
       console.warn(`adsb.lol direct fetch failed (${directErr.message}) \u2014 trying ${CORS_PROXIES.length} proxies one at a time`);
       let lastErr = directErr;
       for (const buildProxyUrl of CORS_PROXIES) {
         try {
-          return await fetchWithTimeout(buildProxyUrl(url), PROXY_ATTEMPT_TIMEOUT_MS);
+          return await fetchWithTimeout(withBust(buildProxyUrl(url)), PROXY_ATTEMPT_TIMEOUT_MS);
         } catch (proxyErr) {
           console.warn(`Proxy attempt failed (${proxyErr.message})`);
           lastErr = proxyErr;

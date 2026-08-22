@@ -111,7 +111,7 @@
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     const start = performance.now();
     try {
-      const res = await fetch(url, { signal: controller.signal });
+      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
       const ms = Math.round(performance.now() - start);
       if (!res.ok) return { ok: false, ms, detail: `HTTP ${res.status}` };
       await res.json();
@@ -132,12 +132,17 @@
   // OpenSky's bbox query) — which is exactly the kind of gap that
   // made "diagnostics says it should work" not match reality. Every
   // proxy is now tested against the REAL target URLs.
+  function withBust(url) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}_=${Date.now()}`;
+  }
+
   const TESTS = [
     { label: 'Control \u2014 api.github.com (known-good)', url: CONTROL_URL },
     { label: 'OpenSky \u2014 direct', url: REAL_OPENSKY_URL },
     { label: 'adsb.lol \u2014 direct', url: REAL_ADSBLOL_URL },
-    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (OpenSky query)`, url: p.build(REAL_OPENSKY_URL) })),
-    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (adsb.lol query)`, url: p.build(REAL_ADSBLOL_URL) })),
+    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (OpenSky query)`, url: withBust(p.build(REAL_OPENSKY_URL)) })),
+    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (adsb.lol query)`, url: withBust(p.build(REAL_ADSBLOL_URL)) })),
   ];
 
   async function runTests() {

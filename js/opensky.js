@@ -45,12 +45,20 @@ const OpenSky = (() => {
   // codetabs has timed out on every single test run so far, so it's
   // tried last (when it fails, it wastes the most time of any of
   // these, so it shouldn't be first in a sequential chain).
+  // Each proxy URL gets a unique cache-busting param appended (via
+  // withBust below) so a proxy that caches responses server-side by
+  // target URL can't serve a stale result — browser cache:no-store
+  // only controls the browser's own cache, not the proxy's.
   const CORS_PROXIES = [
     (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
     (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
   ];
+  function withBust(url) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}_=${Date.now()}`;
+  }
   const REQUEST_TIMEOUT_MS = 10000;
 
   // OpenSky state vector column order, per their API docs.
@@ -105,7 +113,7 @@ const OpenSky = (() => {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      return await fetch(url, { signal: controller.signal });
+      return await fetch(url, { signal: controller.signal, cache: 'no-store' });
     } catch (err) {
       if (err.name === 'AbortError') throw new Error('TIMEOUT');
       throw err;
@@ -135,11 +143,23 @@ const OpenSky = (() => {
     try {
       return await fetchWithTimeout(url, DIRECT_ATTEMPT_TIMEOUT_MS);
     } catch (directErr) {
+      // A private, self-hosted proxy (see cloudflare-worker.js) is
+      // dramatically more reliable than the shared public ones when
+      // configured - no rate limits shared with other users. Try it
+      // first, before falling through to the public fallbacks.
+      if (typeof CustomProxy !== 'undefined' && CustomProxy.has()) {
+        try {
+          console.warn('Trying your configured private proxy first...');
+          return await fetchWithTimeout(withBust(CustomProxy.build(url)), PROXY_ATTEMPT_TIMEOUT_MS);
+        } catch (customErr) {
+          console.warn(`Private proxy failed (${customErr.message}) \u2014 falling back to public proxies`);
+        }
+      }
       console.warn(`Direct fetch failed (${directErr.message}) for ${url} \u2014 trying ${CORS_PROXIES.length} proxies one at a time`);
       let lastErr = directErr;
       for (const buildProxyUrl of CORS_PROXIES) {
         try {
-          return await fetchWithTimeout(buildProxyUrl(url), PROXY_ATTEMPT_TIMEOUT_MS);
+          return await fetchWithTimeout(withBust(buildProxyUrl(url)), PROXY_ATTEMPT_TIMEOUT_MS);
         } catch (proxyErr) {
           console.warn(`Proxy attempt failed (${proxyErr.message})`);
           lastErr = proxyErr;
