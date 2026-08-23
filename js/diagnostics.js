@@ -137,18 +137,34 @@
     return `${url}${sep}_=${Date.now()}`;
   }
 
-  const TESTS = [
-    { label: 'Control \u2014 api.github.com (known-good)', url: CONTROL_URL },
-    { label: 'OpenSky \u2014 direct', url: REAL_OPENSKY_URL },
-    { label: 'adsb.lol \u2014 direct', url: REAL_ADSBLOL_URL },
-    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (OpenSky query)`, url: withBust(p.build(REAL_OPENSKY_URL)) })),
-    ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (adsb.lol query)`, url: withBust(p.build(REAL_ADSBLOL_URL)) })),
-  ];
+  function buildTests() {
+    const customProxyTests =
+      typeof CustomProxy !== 'undefined' && CustomProxy.has()
+        ? [
+            { label: 'Your private proxy (OpenSky query)', url: withBust(CustomProxy.build(REAL_OPENSKY_URL)) },
+            { label: 'Your private proxy (adsb.lol query)', url: withBust(CustomProxy.build(REAL_ADSBLOL_URL)) },
+          ]
+        : [];
+
+    return {
+      customCount: customProxyTests.length,
+      tests: [
+        { label: 'Control \u2014 api.github.com (known-good)', url: CONTROL_URL },
+        { label: 'OpenSky \u2014 direct', url: REAL_OPENSKY_URL },
+        { label: 'adsb.lol \u2014 direct', url: REAL_ADSBLOL_URL },
+        ...customProxyTests,
+        ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (OpenSky query)`, url: withBust(p.build(REAL_OPENSKY_URL)) })),
+        ...CORS_PROXIES.map((p) => ({ label: `Proxy \u2014 ${p.name} (adsb.lol query)`, url: withBust(p.build(REAL_ADSBLOL_URL)) })),
+      ],
+    };
+  }
 
   async function runTests() {
     resultsEl.innerHTML = '';
     summaryEl.textContent = '';
     runBtn.disabled = true;
+
+    const { tests: TESTS, customCount } = buildTests();
 
     const rows = TESTS.map((t) => {
       const row = diagRow(t.label, true, 'Waiting\u2026');
@@ -174,28 +190,35 @@
       results.push({ label: TESTS[i].label, ...result });
     }
 
-    renderSummary(results);
+    renderSummary(results, customCount);
     runBtn.disabled = false;
     runBtn.textContent = 'Run test again';
   }
 
-  function renderSummary(results) {
+  function renderSummary(results, customCount) {
     const control = results[0];
     const openSky = results[1];
     const adsbLol = results[2];
-    const proxyTests = results.slice(3); // 4 proxies x 2 real URLs = 8 entries
-    const workingProxyTests = proxyTests.filter((p) => p.ok);
-    const anyProxyOk = workingProxyTests.length > 0;
+    const customTests = results.slice(3, 3 + customCount);
+    const publicProxyTests = results.slice(3 + customCount);
+    const anyCustomOk = customTests.some((p) => p.ok);
+    const anyPublicOk = publicProxyTests.some((p) => p.ok);
+    const anyProxyOk = anyCustomOk || anyPublicOk;
+
+    const setupSuggestion = customCount
+      ? ''
+      : ' Consider setting up your own private proxy (footer link below) \u2014 public proxies are shared by everyone using them and rate-limit hard.';
 
     if (!control.ok) {
       summaryEl.textContent =
         '\u26a0\ufe0f Even the control test (a well-known, always-up API) failed. This points to something blocking cross-origin requests on this specific browser or network \u2014 a privacy extension, corporate/school firewall, or DNS filtering \u2014 rather than a Vectr or provider problem. Try a different network, a different browser, or temporarily disabling extensions to confirm.';
     } else if (!openSky.ok && !adsbLol.ok && !anyProxyOk) {
-      summaryEl.textContent =
-        '\u26a0\ufe0f The control test passed, but OpenSky, adsb.lol, AND every proxy \u2014 tested against the real query URLs, not just a simple test URL \u2014 failed. These specific services may be down or blocked on this network right now.';
+      summaryEl.textContent = `\u26a0\ufe0f The control test passed, but OpenSky, adsb.lol, AND every proxy \u2014 tested against the real query URLs, not just a simple test URL \u2014 failed. These specific services may be down or blocked on this network right now.${setupSuggestion}`;
     } else if (!openSky.ok && !adsbLol.ok && anyProxyOk) {
-      const workingNames = [...new Set(workingProxyTests.map((p) => p.label.match(/Proxy \u2014 (\S+)/)?.[1]).filter(Boolean))];
-      summaryEl.textContent = `\u2705 Confirmed working against the real query URLs (not just a simple test): ${workingNames.join(', ')}. Vectr will use ${workingNames.length > 1 ? 'these' : 'this'} automatically \u2014 live data should load.`;
+      const allWorking = [...customTests.filter((p) => p.ok), ...publicProxyTests.filter((p) => p.ok)];
+      const workingNames = [...new Set(allWorking.map((p) => p.label.replace(/ \(.*\)$/, '')))];
+      const viaCustom = anyCustomOk ? ' (including your private proxy \u2014 the most reliable option)' : '';
+      summaryEl.textContent = `\u2705 Confirmed working against the real query URLs: ${workingNames.join(', ')}${viaCustom}. Vectr will use this automatically \u2014 live data should load.`;
     } else {
       summaryEl.textContent = '\u2705 At least one live-data path is working directly \u2014 Vectr should be showing live data.';
     }

@@ -1,4 +1,3 @@
-<!-- Start of Project file -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -282,7 +281,24 @@
 <footer class="site-footer">
   <p>Vectr is free &amp; open source. Flight data via <a href="https://opensky-network.org/" target="_blank" rel="noopener">The OpenSky Network</a> and <a href="https://adsb.lol/" target="_blank" rel="noopener">adsb.lol</a>. Map tiles via <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a> / OpenStreetMap. Not for operational or safety-critical use.</p>
   <button id="navDiagnostics" class="diagnostics-link" type="button">🩺 Not seeing live data? Run a connection test</button>
+  <button id="proxySettingsLink" class="diagnostics-link" type="button">⚙ Set up your own private proxy (more reliable)</button>
 </footer>
+
+<div id="proxyModal" class="modal" hidden>
+  <div class="modal-card">
+    <h3>Your private proxy</h3>
+    <p>Public CORS proxies are shared by everyone using them, so they rate-limit hard and inconsistently. Deploying your own free Cloudflare Worker (~3 minutes, no credit card) gives Vectr a private, reliable path that's yours alone.</p>
+    <p>1. Get the Worker script: <code>cloudflare-worker.js</code> (in your project files/repo root — full deploy steps are in its own comments).<br>
+    2. Deploy it free at <a href="https://workers.cloudflare.com" target="_blank" rel="noopener">workers.cloudflare.com</a>.<br>
+    3. Paste your Worker's URL below.</p>
+    <input id="proxyUrlInput" type="text" placeholder="https://your-worker.your-name.workers.dev" />
+    <div class="modal-actions">
+      <button id="proxySaveBtn" class="search-btn">Save</button>
+      <button id="proxyClearBtn" class="chip-btn">Clear</button>
+      <button id="proxyCancelBtn" class="chip-btn">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
@@ -301,6 +317,7 @@
 <script src="js/livemap.js"></script>
 <script src="js/permalink.js"></script>
 <script src="js/diagnostics.js"></script>
+<script src="js/proxysettings.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
