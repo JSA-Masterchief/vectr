@@ -326,34 +326,51 @@ const OpenSky = (() => {
    * Tries OpenSky's own bbox query first, falls back to adsb.lol's
    * point+radius query if OpenSky fails.
    */
+  /**
+   * Fetches state vectors within a bounding box — powers the
+   * Airport Explorer and Live Map. Tries adsb.lol's point+radius
+   * query FIRST (see Day 29 note below), falls back to OpenSky's
+   * bbox endpoint only if that fails.
+   *
+   * DAY 29 FIX: this used to try OpenSky first. Across every real
+   * diagnostic run so far, OpenSky's bbox endpoint has failed
+   * through EVERY available channel — direct connection and all 4
+   * CORS proxies, most timing out at the full 10s each. Meanwhile
+   * adsb.lol (via corsproxy.io specifically) has repeatedly and
+   * consistently succeeded. Trying OpenSky first meant every single
+   * airport-board/live-map request wasted up to ~24 seconds working
+   * through channels that have never once succeeded, before ever
+   * reaching the one that does. Flipped to match the same
+   * evidence-based fix already applied to flight search.
+   */
   async function fetchStatesInBbox(latMin, latMax, lonMin, lonMax) {
     const key = [latMin, latMax, lonMin, lonMax].map((n) => n.toFixed(2)).join(',');
     const cached = bboxCache.get(key);
     const now = Date.now();
     if (cached && now - cached.ts < BBOX_CACHE_MS) return cached.states;
 
-    let openSkyReason = null;
+    let adsbLolReason = null;
     try {
-      const url = `${STATES_URL}?lamin=${latMin}&lamax=${latMax}&lomin=${lonMin}&lomax=${lonMax}`;
-      const res = await robustFetch(url);
-      if (res.status === 429) throw new Error('RATE_LIMIT');
-      if (!res.ok) throw new Error(`HTTP_${res.status}`);
-      const data = await res.json();
-      const states = (data.states || []).map(rowToFlight);
+      const states = await AdsbLol.fetchStatesInBbox(latMin, latMax, lonMin, lonMax);
       bboxCache.set(key, { ts: now, states });
-      reportStatus('opensky', true);
+      reportStatus('adsblol', true);
       return states;
-    } catch (openSkyErr) {
-      openSkyReason = describeError(openSkyErr);
-      console.warn('OpenSky failed:', openSkyReason, '\u2014 falling back to adsb.lol');
+    } catch (adsbErr) {
+      adsbLolReason = describeError(adsbErr);
+      console.warn('adsb.lol failed:', adsbLolReason, '\u2014 falling back to OpenSky');
       try {
-        const states = await AdsbLol.fetchStatesInBbox(latMin, latMax, lonMin, lonMax);
+        const url = `${STATES_URL}?lamin=${latMin}&lamax=${latMax}&lomin=${lonMin}&lomax=${lonMax}`;
+        const res = await robustFetch(url);
+        if (res.status === 429) throw new Error('RATE_LIMIT');
+        if (!res.ok) throw new Error(`HTTP_${res.status}`);
+        const data = await res.json();
+        const states = (data.states || []).map(rowToFlight);
         bboxCache.set(key, { ts: now, states });
-        reportStatus('adsblol', true);
+        reportStatus('opensky', true);
         return states;
-      } catch (fallbackErr) {
-        const adsbLolReason = describeError(fallbackErr);
-        reportStatus(null, false, `OpenSky: ${openSkyReason}, adsb.lol: ${adsbLolReason}`);
+      } catch (openSkyErr) {
+        const openSkyReason = describeError(openSkyErr);
+        reportStatus(null, false, `adsb.lol: ${adsbLolReason}, OpenSky: ${openSkyReason}`);
         throw new DualFailureError(openSkyReason, adsbLolReason);
       }
     }
