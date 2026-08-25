@@ -99,7 +99,6 @@
     { name: 'corsproxy.io', build: (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}` },
     { name: 'thingproxy', build: (url) => `https://thingproxy.freeboard.io/fetch/${url}` },
     { name: 'allorigins', build: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
-    { name: 'codetabs', build: (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}` },
   ];
   const TIMEOUT_MS = 10000;
   const CONTROL_URL = 'https://api.github.com';

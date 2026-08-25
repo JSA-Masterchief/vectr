@@ -49,11 +49,13 @@ const OpenSky = (() => {
   // withBust below) so a proxy that caches responses server-side by
   // target URL can't serve a stale result — browser cache:no-store
   // only controls the browser's own cache, not the proxy's.
+  // codetabs removed (Day 30): failed on every single one of 7
+  // consecutive real test runs with zero exceptions - pure dead
+  // weight, and the proxy that costs the most time when tried.
   const CORS_PROXIES = [
     (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
   ];
   function withBust(url) {
     const sep = url.includes('?') ? '&' : '?';
@@ -122,8 +124,8 @@ const OpenSky = (() => {
     }
   }
 
-  const DIRECT_ATTEMPT_TIMEOUT_MS = 4000; // fail fast - a CORS block rarely needs 10s to reveal itself
-  const PROXY_ATTEMPT_TIMEOUT_MS = 5000; // per-proxy budget when trying sequentially
+  const DIRECT_ATTEMPT_TIMEOUT_MS = 2500; // observed direct failures consistently land under 800ms
+  const PROXY_ATTEMPT_TIMEOUT_MS = 4000;
 
   /**
    * fetch() that, if the direct request fails, tries each CORS

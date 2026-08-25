@@ -24,7 +24,6 @@ const AdsbLol = (() => {
     (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    (url) => `https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`,
   ];
   function withBust(url) {
     const sep = url.includes('?') ? '&' : '?';
@@ -45,8 +44,8 @@ const AdsbLol = (() => {
     }
   }
 
-  const DIRECT_ATTEMPT_TIMEOUT_MS = 4000;
-  const PROXY_ATTEMPT_TIMEOUT_MS = 5000;
+  const DIRECT_ATTEMPT_TIMEOUT_MS = 2500;
+  const PROXY_ATTEMPT_TIMEOUT_MS = 4000;
 
   /** DAY 26: sequential, not parallel - see opensky.js for the full explanation. */
   async function robustFetch(url) {
