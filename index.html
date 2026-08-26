@@ -60,6 +60,7 @@
     <form id="searchForm" class="search-bar" autocomplete="off">
       <span class="search-icon">⌕</span>
       <input id="searchInput" class="search-field" type="text" placeholder="Try BA15, UA123, or BAW15…" maxlength="10" aria-label="Flight number or callsign" />
+      <kbd class="kbd-hint" title="Press / from anywhere to jump here">/</kbd>
       <button type="submit" class="search-btn">Track</button>
     </form>
 
@@ -318,6 +319,7 @@
 <script src="js/permalink.js"></script>
 <script src="js/diagnostics.js"></script>
 <script src="js/proxysettings.js"></script>
+<script src="js/shortcuts.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
