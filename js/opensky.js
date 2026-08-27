@@ -234,25 +234,44 @@ const OpenSky = (() => {
 
   /**
    * Finds live flights matching any of several candidate callsign
-   * patterns. Tries adsb.lol's targeted per-callsign lookup FIRST
-   * (small, fast response) — only falls back to downloading
-   * OpenSky's entire global state list if every candidate lookup
-   * fails there. If BOTH fail, throws a DualFailureError carrying
-   * both real reasons rather than masking one.
+   * patterns. Checks candidates ONE AT A TIME, not simultaneously.
+   *
+   * DAY 32 FIX: this used to check all candidates at once via
+   * Promise.allSettled — e.g. both "BA15" and its resolved ICAO
+   * form "BAW15" simultaneously. Each candidate independently runs
+   * its own full request chain (direct + proxy fallback), so
+   * checking 2 candidates "at once" meant 2 concurrent requests
+   * hitting the same proxy (corsproxy.io) at the same instant —
+   * recreating the exact rate-limit-triggering burst pattern the
+   * Day 26 fix addressed for proxy attempts, just one layer up.
+   * Confirmed directly: an isolated single-candidate diagnostic
+   * request succeeded (200 OK) while the real 2-candidate search
+   * failed with a 429. Sequential checking, stopping at the first
+   * real match, avoids this and is typically just as fast.
    */
   async function findByFlightNumber(candidates) {
     let adsbLolReason = null;
     try {
-      const settled = await Promise.allSettled(candidates.map((c) => AdsbLol.findByCallsign(c)));
-      const fulfilled = settled.filter((r) => r.status === 'fulfilled');
-      if (!fulfilled.length) {
-        const firstRejection = settled.find((r) => r.status === 'rejected');
-        throw firstRejection.reason;
+      let matches = [];
+      let everSucceeded = false;
+      for (const candidate of candidates) {
+        try {
+          const found = await AdsbLol.findByCallsign(candidate);
+          everSucceeded = true;
+          if (found.length) {
+            matches = found;
+            break; // real match found - no need to check remaining candidates
+          }
+        } catch (candidateErr) {
+          adsbLolReason = describeError(candidateErr);
+          // try the remaining candidates; only a full failure below
+          // if every single one throws
+        }
       }
-      const merged = fulfilled.flatMap((r) => r.value);
+      if (!everSucceeded) throw new Error(adsbLolReason || 'UNKNOWN_ERROR');
       reportStatus('adsblol', true);
       const seen = new Set();
-      const matches = merged.filter((f) => {
+      matches = matches.filter((f) => {
         if (seen.has(f.icao24)) return false;
         seen.add(f.icao24);
         return true;
