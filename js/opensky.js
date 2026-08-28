@@ -249,7 +249,25 @@ const OpenSky = (() => {
    * failed with a 429. Sequential checking, stopping at the first
    * real match, avoids this and is typically just as fast.
    */
+  /**
+   * Real airline callsigns broadcast with a 3-letter ICAO prefix
+   * (BAW15), while people usually type the 2-letter IATA form
+   * (BA15). Airlines.expandQuery() returns both, but in whatever
+   * order it built them — reordering here so the ICAO-style
+   * candidate (the one actually likely to match) is tried first
+   * cuts the typical number of round trips in half, now that
+   * candidates are checked sequentially (Day 32).
+   */
+  function prioritizeIcaoStyle(candidates) {
+    return [...candidates].sort((a, b) => {
+      const aIcaoLike = /^[A-Z]{3}\d/.test(a.toUpperCase()) ? 0 : 1;
+      const bIcaoLike = /^[A-Z]{3}\d/.test(b.toUpperCase()) ? 0 : 1;
+      return aIcaoLike - bIcaoLike;
+    });
+  }
+
   async function findByFlightNumber(candidates) {
+    candidates = prioritizeIcaoStyle(candidates);
     let adsbLolReason = null;
     try {
       let matches = [];
