@@ -262,6 +262,7 @@ a{color:var(--accent);}
 .chip:active{transform:translateY(0) scale(0.96);}
 
 .search-status{min-height:24px; margin-top:16px; font-family:var(--font-mono); font-size:.85rem; color:var(--amber);}
+.search-timer{font-family:var(--font-mono); font-size:.85rem; color:var(--text-2); margin-left:6px;}
 
 /* =========================================================
    App view (map + panel)
