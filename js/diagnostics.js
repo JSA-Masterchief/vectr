@@ -1,19 +1,14 @@
 /**
  * diagnostics.js
  * ------------------------------------------------------------
- * Connection diagnostics, now a full page view (Day 20) instead
- * of a modal — the modal ran out of room and things overlapped
- * once the module-check section was added. Same tests as before:
+ * Connection diagnostics page. Module integrity check runs
+ * immediately on load; network tests run one at a time (not
+ * Promise.all - see Day 26) when triggered.
  *
- *   1. Module integrity check — runs immediately on page load,
- *      before any network request, so a missing/misplaced file
- *      doesn't get misdiagnosed as a network problem.
- *   2. A control test (a well-known, always-up API) to tell
- *      "these specific providers are broken" apart from "this
- *      browser/network blocks cross-origin requests generally."
- *   3. OpenSky and adsb.lol direct.
- *   4. Each CORS proxy individually.
- *   5. Manual direct-open links (bypass fetch()/CORS entirely).
+ * DAY 35: corsproxy.io removed from the tested proxy list -
+ * confirmed they now require an API key for reliable access, so
+ * testing the old unauthenticated form just produces a guaranteed,
+ * uninformative 401.
  * ------------------------------------------------------------
  */
 (() => {
@@ -34,9 +29,7 @@
     if (!resultsEl.children.length) runTests();
   });
   bannerDetailsBtn.addEventListener('click', () => Views.show('diagnostics'));
-  if (backBtn) {
-    backBtn.addEventListener('click', () => Views.show('home'));
-  }
+  if (backBtn) backBtn.addEventListener('click', () => Views.show('home'));
 
   // ---------- Module integrity check ----------
   const REQUIRED_MODULES = [
@@ -92,11 +85,10 @@
   runModuleCheck();
 
   // ---------- Network tests ----------
-  // Four proxies, using three DIFFERENT mechanisms (query-param
-  // encoding vs raw URL prepending) so a quirk specific to one
-  // encoding style doesn't take out every fallback at once.
+  // corsproxy.io removed (Day 35): now requires an API key for
+  // reliable access - the plain unauthenticated form returns an
+  // instant HTTP 401, which isn't useful diagnostic information.
   const CORS_PROXIES = [
-    { name: 'corsproxy.io', build: (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}` },
     { name: 'thingproxy', build: (url) => `https://thingproxy.freeboard.io/fetch/${url}` },
     { name: 'allorigins', build: (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
   ];
@@ -104,6 +96,11 @@
   const CONTROL_URL = 'https://api.github.com';
   const REAL_OPENSKY_URL = 'https://opensky-network.org/api/states/all?lamin=51&lamax=52&lomin=0&lomax=1';
   const REAL_ADSBLOL_URL = 'https://api.adsb.lol/v2/callsign/VECTR';
+
+  function withBust(url) {
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}_=${Date.now()}`;
+  }
 
   async function timedFetch(url) {
     const controller = new AbortController();
@@ -122,18 +119,6 @@
     } finally {
       clearTimeout(timer);
     }
-  }
-
-  // IMPORTANT FIX vs the previous version: proxies used to only be
-  // tested against a trivial, parameter-free control URL
-  // (api.github.com). A proxy can handle a simple URL fine and
-  // still fail on a real one with several query parameters (like
-  // OpenSky's bbox query) — which is exactly the kind of gap that
-  // made "diagnostics says it should work" not match reality. Every
-  // proxy is now tested against the REAL target URLs.
-  function withBust(url) {
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}_=${Date.now()}`;
   }
 
   function buildTests() {
@@ -173,11 +158,6 @@
       return row;
     });
 
-    // Sequential, not Promise.all: firing every test simultaneously
-    // sends multiple concurrent requests to the SAME proxy domains
-    // (each proxy is tested twice, once per real URL) — exactly the
-    // burst pattern that triggered an HTTP 429 from a proxy that
-    // works fine when hit once. One at a time gives a true picture.
     const results = [];
     for (let i = 0; i < TESTS.length; i++) {
       runBtn.textContent = `Running\u2026 (${i + 1}/${TESTS.length})`;
@@ -206,18 +186,18 @@
 
     const setupSuggestion = customCount
       ? ''
-      : ' Consider setting up your own private proxy (footer link below) \u2014 public proxies are shared by everyone using them and rate-limit hard.';
+      : ' Consider setting up your own private proxy (footer link below) \u2014 public proxies are shared by everyone using them and rate-limit hard, and some now require paid API keys entirely.';
 
     if (!control.ok) {
       summaryEl.textContent =
-        '\u26a0\ufe0f Even the control test (a well-known, always-up API) failed. This points to something blocking cross-origin requests on this specific browser or network \u2014 a privacy extension, corporate/school firewall, or DNS filtering \u2014 rather than a Vectr or provider problem. Try a different network, a different browser, or temporarily disabling extensions to confirm.';
+        '\u26a0\ufe0f Even the control test (a well-known, always-up API) failed. This points to something blocking cross-origin requests on this specific browser or network \u2014 a privacy extension, corporate/school firewall, or DNS filtering \u2014 rather than a Vectr or provider problem.';
     } else if (!openSky.ok && !adsbLol.ok && !anyProxyOk) {
-      summaryEl.textContent = `\u26a0\ufe0f The control test passed, but OpenSky, adsb.lol, AND every proxy \u2014 tested against the real query URLs, not just a simple test URL \u2014 failed. These specific services may be down or blocked on this network right now.${setupSuggestion}`;
+      summaryEl.textContent = `\u26a0\ufe0f The control test passed, but OpenSky, adsb.lol, AND every proxy \u2014 tested against the real query URLs \u2014 failed.${setupSuggestion}`;
     } else if (!openSky.ok && !adsbLol.ok && anyProxyOk) {
       const allWorking = [...customTests.filter((p) => p.ok), ...publicProxyTests.filter((p) => p.ok)];
       const workingNames = [...new Set(allWorking.map((p) => p.label.replace(/ \(.*\)$/, '')))];
       const viaCustom = anyCustomOk ? ' (including your private proxy \u2014 the most reliable option)' : '';
-      summaryEl.textContent = `\u2705 Confirmed working against the real query URLs: ${workingNames.join(', ')}${viaCustom}. Vectr will use this automatically \u2014 live data should load.`;
+      summaryEl.textContent = `\u2705 Confirmed working: ${workingNames.join(', ')}${viaCustom}. Vectr will use this automatically.`;
     } else {
       summaryEl.textContent = '\u2705 At least one live-data path is working directly \u2014 Vectr should be showing live data.';
     }
