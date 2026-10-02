@@ -3,67 +3,42 @@
  * ------------------------------------------------------------
  * Thin wrapper around The OpenSky Network's public REST API,
  * with automatic fallback to adsb.lol (see adsblol.js), and a
- * further fallback that races several public CORS proxies in
- * parallel if a request fails with what looks like a browser-level
- * network/CORS error rather than a clean HTTP error from the
- * server itself.
+ * further fallback to CORS proxies (private, user-configured one
+ * first if set, then public ones) if a request fails with what
+ * looks like a browser-level network/CORS error.
  *
- * DAY 20 FIX — the actual bug behind "diagnostics says it should
- * work, but nothing loads": findByFlightNumber() and getByIcao24()
- * used to call OpenSky's /states/all with NO bounding box at all —
- * fetching every aircraft on Earth (a multi-megabyte response) just
- * to filter it down to one callsign or one hex client-side. That's
- * wasteful even directly, and free CORS proxies choke on payloads
- * that size even when they handle small test pings fine — which is
- * exactly why the diagnostics panel's lightweight test could pass
- * while the real search kept failing/hanging.
- *
- * Fixed by flipping the order for these two lookups specifically:
- * adsb.lol's targeted callsign/hex endpoints (small, fast, exactly
- * what's needed) are now tried FIRST, with OpenSky's full global
- * list only used as a last-resort fallback. fetchStatesInBbox()
- * (Airport Explorer / Live Map) was never affected by this — it
- * already scopes every query to a bounding box.
- *
- * The public function names/signatures here
- * (`findByFlightNumber`, `getByIcao24`, `fetchStatesInBbox`) are
- * what app.js / airportview.js / livemap.js call — kept stable on
- * purpose so swapping/adding providers never requires touching
- * those files.
+ * DAY 35 FIX — corsproxy.io, which had been the one consistently
+ * working public proxy across many test runs, started returning
+ * instant HTTP 401 responses. Confirmed via their own docs: they
+ * moved to requiring an API key for reliable access. Removed from
+ * the default unauthenticated fallback chain entirely — trying it
+ * now just wastes a request on a guaranteed rejection. This is
+ * exactly the risk of depending on shared free services: policy
+ * can change with no warning. See customproxy.js / the footer's
+ * "private proxy" link for the actually durable fix.
  * ------------------------------------------------------------
  */
 const OpenSky = (() => {
   const STATES_URL = 'https://opensky-network.org/api/states/all';
-  const CACHE_MS = 9000; // don't hammer the API faster than this
-  // Several free, keyless CORS proxies, raced in parallel as a last
-  // resort when a direct fetch fails with what looks like a
-  // browser-level network/CORS error. Racing (not trying one at a
-  // time) means a single slow/dead proxy never delays a request
-  // past however long the fastest working one takes.
-  // Ordered by demonstrated reliability across multiple real test
-  // runs: corsproxy.io has been the most consistently reachable;
-  // codetabs has timed out on every single test run so far, so it's
-  // tried last (when it fails, it wastes the most time of any of
-  // these, so it shouldn't be first in a sequential chain).
-  // Each proxy URL gets a unique cache-busting param appended (via
-  // withBust below) so a proxy that caches responses server-side by
-  // target URL can't serve a stale result — browser cache:no-store
-  // only controls the browser's own cache, not the proxy's.
-  // codetabs removed (Day 30): failed on every single one of 7
-  // consecutive real test runs with zero exceptions - pure dead
-  // weight, and the proxy that costs the most time when tried.
+  const CACHE_MS = 9000;
+
+  // Public proxies, unauthenticated. corsproxy.io removed (Day 35 -
+  // now requires a paid/keyed plan for reliable use). Both
+  // remaining options have a poor track record too (thingproxy
+  // fails near-instantly almost every test; allorigins mostly
+  // times out) - the private proxy (CustomProxy, tried first below
+  // if configured) is the only actually reliable path at this
+  // point.
   const CORS_PROXIES = [
-    (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   ];
+
   function withBust(url) {
     const sep = url.includes('?') ? '&' : '?';
     return `${url}${sep}_=${Date.now()}`;
   }
-  const REQUEST_TIMEOUT_MS = 10000;
 
-  // OpenSky state vector column order, per their API docs.
   const COLS = [
     'icao24', 'callsign', 'origin_country', 'time_position', 'last_contact',
     'longitude', 'latitude', 'baro_altitude', 'on_ground', 'velocity',
@@ -78,7 +53,6 @@ const OpenSky = (() => {
     return f;
   }
 
-  /** Carries BOTH providers' failure reasons, instead of hiding one. */
   class DualFailureError extends Error {
     constructor(openSkyReason, adsbLolReason) {
       super(`OpenSky: ${openSkyReason} \u00b7 adsb.lol: ${adsbLolReason}`);
@@ -92,26 +66,12 @@ const OpenSky = (() => {
   function describeError(err) {
     if (err.message === 'RATE_LIMIT') return 'RATE_LIMIT';
     if (err.message === 'TIMEOUT') return 'TIMEOUT';
-    // A broken/missing dependency (e.g. adsblol.js didn't load, or
-    // loaded after opensky.js) throws a TypeError that looks
-    // identical to a real network failure otherwise — check for it
-    // by name so a deployment problem doesn't get misdiagnosed as a
-    // network/CORS issue.
     if (typeof AdsbLol === 'undefined') return 'ADSBLOL_MODULE_MISSING';
-    // A fetch() TypeError ("Failed to fetch", "NetworkError...") is
-    // the classic browser-side symptom of a CORS block or genuine
-    // connectivity failure — worth distinguishing from a clean HTTP
-    // error status the server actually sent back.
     if (err.name === 'TypeError') return 'NETWORK_OR_CORS';
     return err.message || 'UNKNOWN_ERROR';
   }
 
-  /**
-   * fetch() with a hard timeout. Without this, a hung connection
-   * (common with flaky free APIs/proxies) would leave the UI stuck
-   * on "Searching…" forever with no error ever surfacing.
-   */
-  async function fetchWithTimeout(url, timeoutMs = REQUEST_TIMEOUT_MS) {
+  async function fetchWithTimeout(url, timeoutMs) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -124,31 +84,20 @@ const OpenSky = (() => {
     }
   }
 
-  const DIRECT_ATTEMPT_TIMEOUT_MS = 2500; // observed direct failures consistently land under 800ms
+  const DIRECT_ATTEMPT_TIMEOUT_MS = 2500;
   const PROXY_ATTEMPT_TIMEOUT_MS = 4000;
 
   /**
-   * fetch() that, if the direct request fails, tries each CORS
-   * proxy in sequence (not all at once) until one succeeds.
-   *
-   * DAY 26 FIX — this used to race all proxies in parallel via
-   * Promise.any(), which seemed strictly faster. In practice, firing
-   * 4 simultaneous requests at 4 different free proxy services (and
-   * doing that on every single app request) looks like a burst/abuse
-   * pattern to those services — confirmed directly: a diagnostics run
-   * that fired proxy requests in parallel got back an HTTP 429 (rate
-   * limited) from a proxy that works fine when hit once, in
-   * isolation. Trying them one at a time, each with its own short
-   * timeout, never puts concurrent load on any single proxy.
+   * fetch() that, on direct failure, tries the user's own private
+   * proxy first (if configured - dramatically more reliable), then
+   * each public proxy in sequence (not in parallel - see Day 26:
+   * firing them simultaneously triggers rate limits on shared
+   * services).
    */
   async function robustFetch(url) {
     try {
       return await fetchWithTimeout(url, DIRECT_ATTEMPT_TIMEOUT_MS);
     } catch (directErr) {
-      // A private, self-hosted proxy (see cloudflare-worker.js) is
-      // dramatically more reliable than the shared public ones when
-      // configured - no rate limits shared with other users. Try it
-      // first, before falling through to the public fallbacks.
       if (typeof CustomProxy !== 'undefined' && CustomProxy.has()) {
         try {
           console.warn('Trying your configured private proxy first...');
@@ -174,7 +123,6 @@ const OpenSky = (() => {
   let cache = { ts: 0, states: [] };
   let inflight = null;
 
-  // ---------- Status tracking (for the "live source" indicator in the UI) ----------
   let lastStatus = { provider: null, ok: false, ts: 0, detail: null };
   function reportStatus(provider, ok, detail) {
     lastStatus = { provider, ok, ts: Date.now(), detail: detail || null };
@@ -183,12 +131,6 @@ const OpenSky = (() => {
     return lastStatus;
   }
 
-  /**
-   * Fetches OpenSky's ENTIRE global state list. Expensive (multi-MB
-   * response) — only ever used as a last-resort fallback now (see
-   * the Day 20 fix note at the top of this file), never as the
-   * first thing tried for a single-flight lookup.
-   */
   async function fetchAllStatesFromOpenSky() {
     const now = Date.now();
     if (now - cache.ts < CACHE_MS) return cache.states;
@@ -232,32 +174,7 @@ const OpenSky = (() => {
     );
   }
 
-  /**
-   * Finds live flights matching any of several candidate callsign
-   * patterns. Checks candidates ONE AT A TIME, not simultaneously.
-   *
-   * DAY 32 FIX: this used to check all candidates at once via
-   * Promise.allSettled — e.g. both "BA15" and its resolved ICAO
-   * form "BAW15" simultaneously. Each candidate independently runs
-   * its own full request chain (direct + proxy fallback), so
-   * checking 2 candidates "at once" meant 2 concurrent requests
-   * hitting the same proxy (corsproxy.io) at the same instant —
-   * recreating the exact rate-limit-triggering burst pattern the
-   * Day 26 fix addressed for proxy attempts, just one layer up.
-   * Confirmed directly: an isolated single-candidate diagnostic
-   * request succeeded (200 OK) while the real 2-candidate search
-   * failed with a 429. Sequential checking, stopping at the first
-   * real match, avoids this and is typically just as fast.
-   */
-  /**
-   * Real airline callsigns broadcast with a 3-letter ICAO prefix
-   * (BAW15), while people usually type the 2-letter IATA form
-   * (BA15). Airlines.expandQuery() returns both, but in whatever
-   * order it built them — reordering here so the ICAO-style
-   * candidate (the one actually likely to match) is tried first
-   * cuts the typical number of round trips in half, now that
-   * candidates are checked sequentially (Day 32).
-   */
+  /** Prioritize the ICAO-style candidate (BAW15) over IATA-style (BA15) - that's what's actually broadcast. */
   function prioritizeIcaoStyle(candidates) {
     return [...candidates].sort((a, b) => {
       const aIcaoLike = /^[A-Z]{3}\d/.test(a.toUpperCase()) ? 0 : 1;
@@ -266,6 +183,14 @@ const OpenSky = (() => {
     });
   }
 
+  /**
+   * Finds live flights matching any of several candidate callsign
+   * patterns. Checks candidates ONE AT A TIME (Day 32 - checking
+   * simultaneously recreates the same rate-limit-triggering burst
+   * problem as trying proxies in parallel), ICAO-style form first
+   * (Day 33), via adsb.lol. Falls back to OpenSky's full global
+   * list only if every candidate fails there.
+   */
   async function findByFlightNumber(candidates) {
     candidates = prioritizeIcaoStyle(candidates);
     let adsbLolReason = null;
@@ -278,12 +203,10 @@ const OpenSky = (() => {
           everSucceeded = true;
           if (found.length) {
             matches = found;
-            break; // real match found - no need to check remaining candidates
+            break;
           }
         } catch (candidateErr) {
           adsbLolReason = describeError(candidateErr);
-          // try the remaining candidates; only a full failure below
-          // if every single one throws
         }
       }
       if (!everSucceeded) throw new Error(adsbLolReason || 'UNKNOWN_ERROR');
@@ -295,9 +218,6 @@ const OpenSky = (() => {
         return true;
       });
       if (matches.length) return matches;
-      // adsb.lol answered successfully but genuinely found nothing —
-      // still worth trying OpenSky's full list before reporting "no
-      // matches", in case adsb.lol just doesn't have this aircraft.
       throw new Error('NO_MATCH');
     } catch (adsbErr) {
       adsbLolReason = describeError(adsbErr);
@@ -313,9 +233,6 @@ const OpenSky = (() => {
         console.error('OpenSky fallback also failed:', openSkyReason);
         reportStatus(null, false, `adsb.lol: ${adsbLolReason}, OpenSky: ${openSkyReason}`);
         if (adsbLolReason === 'NO_MATCH') {
-          // adsb.lol had no data AND OpenSky failed outright - surface
-          // the OpenSky failure, since "no match" isn't really a
-          // failure worth alarming about on its own.
           throw new DualFailureError(openSkyReason, 'no match found');
         }
         throw new DualFailureError(openSkyReason, adsbLolReason);
@@ -324,10 +241,8 @@ const OpenSky = (() => {
   }
 
   /**
-   * Looks up one aircraft by its ICAO24 hex address (used to
-   * refresh the currently tracked flight). Tries adsb.lol's direct
-   * hex lookup first (targeted, fast), falls back to OpenSky's
-   * cached global state list only if that fails.
+   * Looks up one aircraft by ICAO24 hex. Tries adsb.lol's direct
+   * hex lookup first, falls back to OpenSky's cached global list.
    */
   async function getByIcao24(icao24) {
     let adsbLolReason = null;
@@ -353,34 +268,15 @@ const OpenSky = (() => {
     }
   }
 
-  // Separate short-lived cache per bbox key so the Airport Explorer's
-  // and Live Map's frequent, geographically-scoped queries don't get
-  // lumped in with (or invalidated by) the whole-globe cache above.
   const bboxCache = new Map();
   const BBOX_CACHE_MS = 9000;
 
   /**
-   * Fetches state vectors within a bounding box — always scoped, so
-   * this was never affected by the Day 20 "unbounded fetch" bug.
-   * Tries OpenSky's own bbox query first, falls back to adsb.lol's
-   * point+radius query if OpenSky fails.
-   */
-  /**
-   * Fetches state vectors within a bounding box — powers the
-   * Airport Explorer and Live Map. Tries adsb.lol's point+radius
-   * query FIRST (see Day 29 note below), falls back to OpenSky's
-   * bbox endpoint only if that fails.
-   *
-   * DAY 29 FIX: this used to try OpenSky first. Across every real
-   * diagnostic run so far, OpenSky's bbox endpoint has failed
-   * through EVERY available channel — direct connection and all 4
-   * CORS proxies, most timing out at the full 10s each. Meanwhile
-   * adsb.lol (via corsproxy.io specifically) has repeatedly and
-   * consistently succeeded. Trying OpenSky first meant every single
-   * airport-board/live-map request wasted up to ~24 seconds working
-   * through channels that have never once succeeded, before ever
-   * reaching the one that does. Flipped to match the same
-   * evidence-based fix already applied to flight search.
+   * Fetches state vectors within a bounding box (Airport Explorer /
+   * Live Map). Tries adsb.lol first (Day 29 - OpenSky's bbox
+   * endpoint has failed through every available channel across
+   * every test run so far), falls back to OpenSky only if that
+   * fails.
    */
   async function fetchStatesInBbox(latMin, latMax, lonMin, lonMax) {
     const key = [latMin, latMax, lonMin, lonMax].map((n) => n.toFixed(2)).join(',');
