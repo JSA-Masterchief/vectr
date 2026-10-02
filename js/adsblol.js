@@ -1,37 +1,31 @@
 /**
  * adsblol.js
  * ------------------------------------------------------------
- * Wrapper around adsb.lol's public OpenAPI (https://api.adsb.lol),
- * a free, keyless, community-run ADS-B network, ADSBExchange v2
- * format-compatible. As of Day 20, this is the PRIMARY path for
- * single-flight lookups (findByFlightNumber / getByIcao24 in
- * opensky.js) — its targeted callsign/hex endpoints return small,
- * fast responses, unlike OpenSky's unbounded global state list,
- * which chokes free CORS proxies on anything but a trivial test
- * query. OpenSky remains primary for bounding-box queries (Airport
- * Explorer / Live Map), which were never affected by that issue.
+ * Wrapper around adsb.lol's public OpenAPI. Primary path for
+ * single-flight lookups AND bounding-box queries (Days 20 & 29 -
+ * OpenSky proved unreliable through every available channel).
  *
- * adsb.lol's response units differ from OpenSky's (feet/knots/
- * feet-per-minute vs meters/m-per-second), so every function here
- * normalizes to the exact same flight object shape OpenSky uses,
- * so the rest of the app never needs to know which provider
- * actually answered.
+ * DAY 35: corsproxy.io removed from the public fallback list -
+ * confirmed via their own docs they now require an API key for
+ * reliable access; the plain unauthenticated form started
+ * returning instant HTTP 401s. See customproxy.js for the durable
+ * fix (a private, self-hosted proxy).
  * ------------------------------------------------------------
  */
 const AdsbLol = (() => {
   const BASE = 'https://api.adsb.lol/v2';
+
   const CORS_PROXIES = [
-    (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
     (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
     (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
   ];
+
   function withBust(url) {
     const sep = url.includes('?') ? '&' : '?';
     return `${url}${sep}_=${Date.now()}`;
   }
-  const REQUEST_TIMEOUT_MS = 10000;
 
-  async function fetchWithTimeout(url, timeoutMs = REQUEST_TIMEOUT_MS) {
+  async function fetchWithTimeout(url, timeoutMs) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
@@ -47,7 +41,6 @@ const AdsbLol = (() => {
   const DIRECT_ATTEMPT_TIMEOUT_MS = 2500;
   const PROXY_ATTEMPT_TIMEOUT_MS = 4000;
 
-  /** DAY 26: sequential, not parallel - see opensky.js for the full explanation. */
   async function robustFetch(url) {
     try {
       return await fetchWithTimeout(url, DIRECT_ATTEMPT_TIMEOUT_MS);
@@ -81,7 +74,7 @@ const AdsbLol = (() => {
     return {
       icao24: (ac.hex || '').toLowerCase(),
       callsign: (ac.flight || '').trim(),
-      origin_country: null, // adsb.lol doesn't expose registration country
+      origin_country: null,
       time_position: ac.seen_pos != null ? Date.now() / 1000 - ac.seen_pos : null,
       last_contact: ac.seen != null ? Date.now() / 1000 - ac.seen : null,
       longitude: ac.lon ?? null,
@@ -123,11 +116,6 @@ const AdsbLol = (() => {
     return list[0] || null;
   }
 
-  /**
-   * adsb.lol's public OpenAPI does bounding-circle queries (point +
-   * radius in nautical miles), not bounding boxes, so bbox callers
-   * convert to a center point + radius that covers the box.
-   */
   async function fetchStatesInBbox(latMin, latMax, lonMin, lonMax) {
     const centerLat = (latMin + latMax) / 2;
     const centerLon = (lonMin + lonMax) / 2;
@@ -144,11 +132,6 @@ const AdsbLol = (() => {
 
   const metadataCache = new Map();
 
-  /**
-   * Looks up just the static aircraft info (registration + type) for
-   * an ICAO24 hex, regardless of which provider actually supplied
-   * the live position. Cached indefinitely per session.
-   */
   async function getAircraftMetadata(icao24) {
     if (metadataCache.has(icao24)) return metadataCache.get(icao24);
     try {
